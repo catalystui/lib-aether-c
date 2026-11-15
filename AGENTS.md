@@ -2,7 +2,7 @@
 
 # Aether Project Contract
 
-`lib-aether-c` (Aether) provides cross-platform C ABI libraries for native system-level bindings and operating system functionality. It exposes underlying system capabilities associated with CatalystUI's Layer 1: System; windowing belongs to Crystal (`lib-crystal-c`). Follow applicable CatalystUI specifications; do not invent new semantics or architectural requirements.
+`lib-aether-c` (Aether) is the native system ABI for CatalystUI, implementing Layer 1: System. Provide portable contracts for native system-level bindings and operating system functionality; windowing belongs to Crystal (`lib-crystal-c`). Follow applicable CatalystUI specifications; do not invent new semantics or architectural requirements.
 
 ## Working Rules
 

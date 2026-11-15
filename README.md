@@ -3,7 +3,7 @@
 <h1 align="center">CatalystUI – Aether</h1>
 <p align="center"><strong>The universal translator between computers and people.</strong></p>
 <p align="center">
-  <em>Native system-level bindings and operating system functionality for CatalystUI.</em>
+  <em>The native system ABI for CatalystUI.</em>
 </p>
 
 <p align="center">
@@ -16,14 +16,14 @@
 
 ## About Aether
 
-Aether is a collection of cross-platform C ABI libraries for working with native system-level bindings and operating system functionality. It provides access to the underlying capabilities associated with **Layer 1: System** of the CatalystUI model.
+Aether is the system library for CatalystUI, implementing **Layer 1: System** of the CatalystUI model through a native C ABI.
 
-The project aims to make operating system services accessible through consistent, portable contracts while preserving the capabilities of each native platform. Aether is focused on the underlying system itself; windowing is the responsibility of Crystal.
+Aether aims to make native system-level bindings and operating system services accessible through consistent, portable contracts while preserving the capabilities of each native platform. Aether is focused on the underlying system itself; windowing is the responsibility of Crystal.
 
 ## Development Status
 
 > [!NOTE]
-> This implementation is in its earliest stage of development. The shared build environment is in place, but public APIs, library implementations, and runtime support have not yet been added.
+> This implementation is in its earliest stage of development. The shared build environment is in place, but public APIs, the library implementation, and runtime support have not yet been added.
 
 ## Getting Started
 
