@@ -1,6 +1,6 @@
 <!-- AI AGENTS: DO NOT USE README.md as development context or modify it unless explicitly instructed by the user. This file is intended for human readers only. Read AGENTS.md for all AI development instructions, architectural requirements, and repository conventions. -->
 
-<h1 align="center">Aether</h1>
+<h1 align="center">CatalystUI – Aether</h1>
 <p align="center"><strong>The universal translator between computers and people.</strong></p>
 <p align="center">
   <em>Native system-level bindings and operating system functionality for CatalystUI.</em>
