@@ -1,6 +1,6 @@
 <!-- AI AGENTS: DO NOT USE README.md as development context or modify it unless explicitly instructed by the user. This file is intended for human readers only. Read AGENTS.md for all AI development instructions, architectural requirements, and repository conventions. -->
 
-<h1 align="center">System</h1>
+<h1 align="center">Aether</h1>
 <p align="center"><strong>The universal translator between computers and people.</strong></p>
 <p align="center">
   <em>Native system-level bindings and operating system functionality for CatalystUI.</em>
@@ -11,14 +11,14 @@
   <img src="https://img.shields.io/badge/Interface-C%20ABI-00599C?style=flat-square&amp;logo=c&amp;logoColor=white" alt="Interface: C ABI">
   <img src="https://img.shields.io/badge/CatalystUI-System%20Layer-526b80?style=flat-square" alt="CatalystUI: System layer">
   <img src="https://img.shields.io/badge/Build-CMake%204.3%2B-064F8C?style=flat-square&amp;logo=cmake&amp;logoColor=white" alt="Build: CMake 4.3+">
-  <a href="https://github.com/catalystui/lib-system-c/commits/main"><img src="https://img.shields.io/github/last-commit/catalystui/lib-system-c?style=flat-square&amp;logo=github&amp;logoColor=white" alt="Last commit"></a>
+  <a href="https://github.com/catalystui/lib-aether-c/commits/main"><img src="https://img.shields.io/github/last-commit/catalystui/lib-aether-c?style=flat-square&amp;logo=github&amp;logoColor=white" alt="Last commit"></a>
 </p>
 
-## About System
+## About Aether
 
-System is a collection of cross-platform C ABI libraries for working with native system-level bindings and operating system functionality. It provides access to the underlying capabilities associated with **Layer 1: System** of the CatalystUI model.
+Aether is a collection of cross-platform C ABI libraries for working with native system-level bindings and operating system functionality. It provides access to the underlying capabilities associated with **Layer 1: System** of the CatalystUI model.
 
-The project aims to make operating system services accessible through consistent, portable contracts while preserving the capabilities of each native platform. System is focused on the underlying system itself; windowing is the responsibility of Crystal.
+The project aims to make operating system services accessible through consistent, portable contracts while preserving the capabilities of each native platform. Aether is focused on the underlying system itself; windowing is the responsibility of Crystal.
 
 ## Development Status
 
@@ -32,8 +32,8 @@ The repository uses **CMake 4.3 or later**, Git, and a C/C++ toolchain appropria
 Clone the repository along with its shared build infrastructure:
 
 ```powershell
-git clone --recurse-submodules https://github.com/catalystui/lib-system-c.git
-Set-Location lib-system-c
+git clone --recurse-submodules https://github.com/catalystui/lib-aether-c.git
+Set-Location lib-aether-c
 cmake --list-presets
 ```
 
@@ -72,7 +72,7 @@ There are currently no library targets to compile. Preset availability depends o
 
 ## AI-Assisted Development
 
-System is developed with AI assistance under human direction. AI coding agents assist with implementation and repository maintenance, while the project owner defines the model, requirements, and design decisions.
+Aether is developed with AI assistance under human direction. AI coding agents assist with implementation and repository maintenance, while the project owner defines the model, requirements, and design decisions.
 
 AI-assisted contributions are subject to the same expectations for correctness, maintainability, attribution, and licensing as human-written contributions. Their presence does not imply independent line-by-line human review.
 

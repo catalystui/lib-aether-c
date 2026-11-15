@@ -1,8 +1,8 @@
 > **PRIMARY PROJECT CONTEXT** — Read this file before work. Keep it concise, current, and actionable. Do not use README.md as development context or edit it without explicit user authorization.
 
-# System Project Contract
+# Aether Project Contract
 
-`lib-system-c` provides cross-platform C ABI libraries for native system-level bindings and operating system functionality. It exposes underlying system capabilities associated with CatalystUI's Layer 1: System; windowing belongs to Crystal (`lib-crystal-c`). Follow applicable CatalystUI specifications; do not invent new semantics or architectural requirements.
+`lib-aether-c` (Aether) provides cross-platform C ABI libraries for native system-level bindings and operating system functionality. It exposes underlying system capabilities associated with CatalystUI's Layer 1: System; windowing belongs to Crystal (`lib-crystal-c`). Follow applicable CatalystUI specifications; do not invent new semantics or architectural requirements.
 
 ## Working Rules
 
