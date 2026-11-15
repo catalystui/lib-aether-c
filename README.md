@@ -25,6 +25,14 @@ Aether aims to make native system-level bindings and operating system services a
 > [!NOTE]
 > This implementation is in its earliest stage of development. The shared build environment is in place, but public APIs, the library implementation, and runtime support have not yet been added.
 
+## Libraries
+
+| Library | Windows | macOS | Linux | Description |
+| --- | --- | --- | --- | --- |
+| Aether | Not yet defined | Not yet defined | Not yet defined | Native system-level bindings and operating system functionality. |
+
+Aether does not yet define a library target or export binary files.
+
 ## Getting Started
 
 The repository uses **CMake 4.3 or later**, Git, and a C/C++ toolchain appropriate for the selected build preset.
@@ -50,25 +58,6 @@ cmake --preset aclang17-darwin24.6-arm64
 ```
 
 There are currently no library targets to compile. Preset availability depends on the host and installed toolchain; the presence of a preset does not imply verified runtime support.
-
-## Related Projects
-
-<table>
-  <tr>
-    <td width="33%" valign="top">
-      <h3><a href="https://github.com/catalystui/lib-core-c">lib-core-c</a></h3>
-      <p>Foundational C ABI libraries for CatalystUI core types, memory management, and text encoding.</p>
-    </td>
-    <td width="33%" valign="top">
-      <h3><a href="https://github.com/catalystui/build-cmake">build-cmake</a></h3>
-      <p>Shared CMake configuration, target metadata, and platform-specific build presets for CatalystUI's native libraries.</p>
-    </td>
-    <td width="33%" valign="top">
-      <h3><a href="https://github.com/catalystui/lib-crystal-c">lib-crystal-c</a></h3>
-      <p>Crystal, the native windowing ABI for CatalystUI.</p>
-    </td>
-  </tr>
-</table>
 
 ## AI-Assisted Development
 
