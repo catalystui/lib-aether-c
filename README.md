@@ -25,14 +25,6 @@ Aether aims to make native system-level bindings and operating system services a
 > [!NOTE]
 > This implementation is in its earliest stage of development. The shared build environment is in place, but public APIs, the library implementation, and runtime support have not yet been added.
 
-## Libraries
-
-| Library | Windows | macOS | Linux | Description |
-| --- | --- | --- | --- | --- |
-| Aether | Not yet defined | Not yet defined | Not yet defined | Native system-level bindings and operating system functionality. |
-
-Aether does not yet define a library target or export binary files.
-
 ## Getting Started
 
 The repository uses **CMake 4.3 or later**, Git, and a C/C++ toolchain appropriate for the selected build preset.
