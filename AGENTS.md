@@ -4,6 +4,12 @@
 
 `lib-aether-c` (Aether) is the native system ABI for CatalystUI, implementing Layer 1: System. Provide portable contracts for native system-level bindings and operating system functionality; windowing belongs to Crystal (`lib-crystal-c`). Follow applicable CatalystUI specifications; do not invent new semantics or architectural requirements.
 
+## Core/Aether Boundary
+
+- **ALL-systems rule:** Core owns representations and operations that are meaningfully supported by **all** Catalyst-supported computing systems, even when their implementations differ by platform. Fundamental memory operations belong in Core, not Aether.
+- Aether exposes capabilities that are **system-specific** or unavailable on some supported systems, such as operating-system-specific memory facilities. Do not move universal functionality into Aether simply because its implementation uses native system APIs; Core may implement its universal contracts using native mechanisms directly.
+- Do not invent emulations or pretend that a system-specific capability exists on every target. Keep platform-dependent availability explicit. Windowing remains Crystal's responsibility under the existing layer boundary.
+
 ## Working Rules
 
 - Inspect relevant source, instructions, and Git state first. Preserve unrelated changes and keep work narrowly scoped to the user's request.
