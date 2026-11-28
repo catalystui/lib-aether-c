@@ -3,6 +3,7 @@
 #include "catdvlib.h"
 #include "catalyst.hpp"
 #include "catmmlib.h"
+#include "catdvlib.display.hpp"
 
 
 /* Snapshot storage for native Windows and Darwin enumeration. All strings
@@ -20,6 +21,7 @@ struct CATDVLIB_DEVICE {
     catalyst::NUINT hwid_count;
     catalyst::STATUS_CODE hwid_status, capability_status;
     CATALYST_BOOL input, output;
+    CATDVLIB_DISPLAY display;
 };
 struct CATDVLIB_DEVICES {
     CATDVLIB_DEVICE* data;

@@ -1,6 +1,7 @@
 #include "catdvlib.h"
 #include "catdvlib.linux.hpp"
 #include "cattelib.h"
+#include "catdvlib.display.hpp"
 #include <dirent.h>
 
 /* Linux sysfs text attributes are read once into the snapshot. Long values
@@ -17,6 +18,7 @@ struct CATDVLIB_DEVICE {
     CATALYST_ASCII bus_scheme;
     CATALYST_STATUS_CODE capability_status;
     CATALYST_BOOL input, output;
+    CATDVLIB_DISPLAY display;
 };
 
 struct CATDVLIB_DEVICES {
@@ -133,7 +135,46 @@ static void catdv_bus_hwid(CATDVLIB_DEVICE* device, CATALYST_BYTE kind) {
     device->bus_hwid.status = catalyst::STATUS_CODE_SUCCESS;
 }
 
+/* DRM connector EDID is a binary sysfs attribute. Read to EOF; never trim bytes. */
+static void catdv_linux_display(CATDVLIB_DEVICE* device) {
+    catdv_display_init(&device->display);
+    device->type = CATDVLIB_DEVICE_LOGICAL;
+    device->capability_status = CATALYST_STATUS_CODE_SUCCESS;
+    device->output = CATALYST_TRUE;
+    device->hwid.status = device->bus_hwid.status = device->serial.status = device->manufacturer.status =
+        device->product.status = device->revision.status = CATALYST_STATUS_CODE_ERROR_NOT_FOUND;
+    const char* name = catdv_basename(device->path);
+    catalyst::NUINT length = catdv_native_extent(name);
+    device->descriptor.status = CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW;
+    if (length < sizeof(device->descriptor.text)) {
+        catmm_copy(device->descriptor.text, name, length + 1);
+        device->descriptor.status = CATALYST_STATUS_CODE_SUCCESS;
+    }
+    char path[PATH_MAX];
+    if (!catdv_join(path, sizeof(path), device->path, "edid")) {
+        device->display.edid_status = CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW; return;
+    }
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) { device->display.edid_status = catdv_errno(errno); return; }
+    /* The base block plus up to 255 extensions occupy at most 32768 bytes. */
+    CATALYST_BYTE bytes[32769];
+    catalyst::NUINT used = 0;
+    catalyst::STATUS_CODE status = CATALYST_STATUS_CODE_SUCCESS;
+    while (used < sizeof(bytes)) {
+        ssize_t got = read(fd, bytes + used, sizeof(bytes) - used);
+        if (got < 0) { status = catdv_errno(errno); break; }
+        if (!got) break;
+        used += (catalyst::NUINT) got;
+    }
+    if (close(fd) != 0 && status == CATALYST_STATUS_CODE_SUCCESS) status = catdv_errno(errno);
+    if (status == CATALYST_STATUS_CODE_SUCCESS)
+        status = used == sizeof(bytes) ? CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW :
+            catdv_display_copy_edid(&device->display, bytes, used);
+    device->display.edid_status = status;
+}
+
 static void catdv_fill(CATDVLIB_DEVICE* device, CATALYST_BYTE kind) {
+    if (kind == 3) { catdv_linux_display(device); return; }
     device->type = kind == 2 ? CATDVLIB_DEVICE_LOGICAL : CATDVLIB_DEVICE_PHYSICAL;
     /* USB interface records are logical; PCI records identify hardware functions. */
     if (kind == 0) {
@@ -196,6 +237,11 @@ static CATALYST_RESULT catdv_scan(CATDVLIB_DEVICES* snapshot, const char* root, 
             if (resolved_status == catalyst::STATUS_CODE_ERROR_NOT_FOUND) continue;
             result = catalyst::RESULT(resolved_status, 0x80, 6, 0); break;
         }
+        if (kind == 3) {
+            CATDVLIB_TEXT connected;
+            catdv_attribute(resolved, "status", &connected);
+            if (connected.status != CATALYST_STATUS_CODE_SUCCESS || !catdv_native_equal(connected.text, "connected")) continue;
+        }
         CATALYST_NUINT length;
         CATALYST_RESULT valid = catte_utf8_length((CATALYST_UTF8) resolved, &length);
         if (!CATALYST_STATUS_CODE_IS_SUCCESS(valid.status)) {
@@ -235,14 +281,14 @@ CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices) {
     CATALYST_RESULT r = catmm_alloc(&memory, sizeof(CATDVLIB_DEVICES));
     if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return catalyst::RESULT(r.status, 0x01, 0x01, r.detail);
     CATDVLIB_DEVICES* snapshot = (CATDVLIB_DEVICES*) memory;
-    const char* roots[] = { "/sys/bus/usb/devices", "/sys/bus/pci/devices", "/sys/class/input" };
+    const char* roots[] = { "/sys/bus/usb/devices", "/sys/bus/pci/devices", "/sys/class/input", "/sys/class/drm" };
     if (access("/sys/devices", F_OK) != 0 || access("/proc/self/fd", X_OK) != 0) {
         CATALYST_STATUS_CODE status = catdv_errno(errno);
         CATALYST_RESULT released = catmm_free(snapshot);
         if (!CATALYST_STATUS_CODE_IS_SUCCESS(released.status)) return catalyst::RESULT(released.status, 0x01, 0x02, released.detail);
         return catalyst::RESULT(status, 0x01, 0x03, 0);
     }
-    for (CATALYST_BYTE k = 0; k < 3; ++k) {
+    for (CATALYST_BYTE k = 0; k < 4; ++k) {
         r = catdv_scan(snapshot, roots[k], k);
         if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) {
             CATALYST_RESULT released = catdv_devices_free(snapshot);
@@ -256,6 +302,10 @@ CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices) {
 
 CATALYST_RESULT catdv_devices_free(CATDVLIB_DEVICES* devices) {
     if (devices->data != 0) {
+        for (catalyst::NUINT j = 0; j < devices->count; ++j) {
+            catalyst::RESULT released = catdv_display_release(&devices->data[j].display);
+            if (!CATALYST_STATUS_CODE_IS_SUCCESS(released.status)) return catalyst::RESULT(released.status, 0x02, 0x04, released.detail);
+        }
         CATALYST_RESULT r = catmm_free(devices->data);
         if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return catalyst::RESULT(r.status, 0x02, 0x01, r.detail);
         devices->data = 0;
@@ -356,3 +406,25 @@ CATALYST_RESULT catdv_device_has_output(const CATDVLIB_DEVICE* device, CATALYST_
     return catalyst::RESULT(catalyst::STATUS_CODE_SUCCESS, 0x0F, 0x03, 0);
 }
 
+
+CATALYST_BOOL catdv_device_is_display(const CATDVLIB_DEVICE* device) {
+    return device->display.present;
+}
+
+CATALYST_RESULT catdv_display_get_edid(const CATDVLIB_DEVICE* device, const CATALYST_BYTE** bytes, CATALYST_NUINT* size) {
+    *bytes = 0; *size = 0;
+    if (!device->display.present) return catalyst::RESULT(CATALYST_STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED, 0x10, 0x01, 0);
+    if (device->display.edid_status != CATALYST_STATUS_CODE_SUCCESS)
+        return catalyst::RESULT(device->display.edid_status, 0x10, 0x02, 0);
+    *bytes = device->display.bytes; *size = device->display.size;
+    return catalyst::RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x10, 0x03, 0);
+}
+
+CATALYST_RESULT catdv_display_get_native_handle(const CATDVLIB_DEVICE* device, CATALYST_NUINT* handle) {
+    *handle = 0;
+    if (!device->display.present) return catalyst::RESULT(CATALYST_STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED, 0x11, 0x01, 0);
+    if (device->display.handle_status != CATALYST_STATUS_CODE_SUCCESS)
+        return catalyst::RESULT(device->display.handle_status, 0x11, 0x02, 0);
+    *handle = device->display.handle;
+    return catalyst::RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x11, 0x03, 0);
+}

@@ -67,8 +67,56 @@ int main(int argc, char** argv) {
         if (report.result("output capability", r, 0x0F))
             report.check(same_result(r, c) && supported == cppSupported, "output capability parity");
         else report.check(!supported, "output failure output");
+        // Instance lookup must identify this exact borrowed record.
+        CATDVLIB_IDENTIFIER lookupId = {0, 0};
+        if (catdv_device_get_identifier(d, &lookupId).status == catalyst::STATUS_CODE_SUCCESS) {
+            const CATDVLIB_DEVICE* match = 0;
+            catalyst::RESULT found = catdv_devices_find_identifier(snapshot, &lookupId, &match);
+            const CATDVLIB_DEVICE* cppMatch = 0;
+            catalyst::RESULT cppFound = catalyst::device::devices_find_identifier(snapshot, &lookupId, &cppMatch);
+            report.check(same_result(found, cppFound) && match == cppMatch, "identifier lookup parity");
+            if (report.result("instance lookup", found, 0x12)) report.check(match == d, "instance lookup identity");
+        }
+        catalyst::BOOL display = catdv_device_is_display(d);
+        report.check(display == catalyst::device::device_is_display(d), "display classification parity");
+        if (display) {
+            std::printf("  Display endpoint\n");
+            const CATALYST_BYTE* bytes = 0, *cppBytes = 0;
+            catalyst::NUINT size = 0, cppSize = 0;
+            catalyst::RESULT er = catdv_display_get_edid(d, &bytes, &size);
+            catalyst::RESULT ec = catalyst::device::display_get_edid(d, &cppBytes, &cppSize);
+            report.check(same_result(er, ec) && bytes == cppBytes && size == cppSize, "EDID parity");
+            if (er.status == catalyst::STATUS_CODE_ERROR_INVALID_STATE) report.skip("ambiguous EDID association");
+            else if (report.result("EDID acquisition", er, 0x10)) {
+                report.check(bytes && size, "borrowed EDID extent");
+                std::printf("  EDID: %lu bytes\n", (unsigned long) size);
+            }
+            if (er.status != catalyst::STATUS_CODE_SUCCESS) report.check(!bytes && !size, "EDID failure outputs");
+            catalyst::NUINT handle = 0, cppHandle = 0;
+            catalyst::RESULT hr = catdv_display_get_native_handle(d, &handle);
+            catalyst::RESULT hc = catalyst::device::display_get_native_handle(d, &cppHandle);
+            report.check(same_result(hr, hc) && handle == cppHandle, "native handle parity");
+            if (report.result("native display handle", hr, 0x11)) {
+                const CATDVLIB_DEVICE* match = 0;
+                catalyst::RESULT found = catdv_devices_find_native_display(snapshot, handle, &match);
+                const CATDVLIB_DEVICE* cppMatch = 0;
+                catalyst::RESULT cppFound = catalyst::device::devices_find_native_display(snapshot, handle, &cppMatch);
+                report.check(same_result(found, cppFound) && match == cppMatch, "native display lookup parity");
+                if (found.status == catalyst::STATUS_CODE_ERROR_INVALID_STATE) {
+                    report.check(!match, "ambiguous native handle failure output");
+                    report.skip("native display handle identifies multiple endpoints");
+                } else if (report.result("native display lookup", found, 0x13))
+                    report.check(match == d, "native display lookup identity");
+                std::printf("  Native display handle: %p\n", (void*) handle);
+            } else report.check(!handle, "native handle failure output");
+        }
         report.summary(before);
     }
+    CATDVLIB_IDENTIFIER absent = { (CATALYST_ASCII) "test-absent-scheme", (CATALYST_UTF8) "absent" };
+    const CATDVLIB_DEVICE* missing = 0;
+    catalyst::RESULT notFound = catdv_devices_find_identifier(snapshot, &absent, &missing);
+    report.check(notFound.status == catalyst::STATUS_CODE_ERROR_NOT_FOUND && notFound.context == 0x12 &&
+        notFound.operation == 0x03 && !notFound.detail && !missing, "missing instance lookup");
     report.result("free snapshot", catalyst::device::devices_free(snapshot), 0x02);
     snapshot = 0;
     catalyst::RESULT r = catalyst::device::devices_enumerate(&snapshot);

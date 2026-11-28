@@ -66,6 +66,26 @@ inline RESULT device_has_output(const CATDVLIB_DEVICE* device, BOOL* supported) 
     return ::catdv_device_has_output(device, supported);
 }
 
+inline BOOL device_is_display(const CATDVLIB_DEVICE* device) {
+    return ::catdv_device_is_display(device);
+}
+
+inline RESULT display_get_edid(const CATDVLIB_DEVICE* device, const BYTE** bytes, NUINT* size) {
+    return ::catdv_display_get_edid(device, bytes, size);
+}
+
+inline RESULT display_get_native_handle(const CATDVLIB_DEVICE* device, NUINT* handle) {
+    return ::catdv_display_get_native_handle(device, handle);
+}
+
+inline RESULT devices_find_identifier(const CATDVLIB_DEVICES* devices, const CATDVLIB_IDENTIFIER* identifier, const CATDVLIB_DEVICE** device) {
+    return ::catdv_devices_find_identifier(devices, identifier, device);
+}
+
+inline RESULT devices_find_native_display(const CATDVLIB_DEVICES* devices, NUINT handle, const CATDVLIB_DEVICE** device) {
+    return ::catdv_devices_find_native_display(devices, handle, device);
+}
+
 } /* namespace */
 } /* namespace catalyst */
 #endif /* CATDVLIB_HPP */

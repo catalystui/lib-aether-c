@@ -28,7 +28,14 @@ static PerfOutcome query(void* fixture, bool cpp) {
         case 0x0C: r = cpp ? catalyst::device::device_get_descriptor(f->device, &value) : catalyst::RESULT(catdv_device_get_descriptor(f->device, &value)); break;
         case 0x0D: r = cpp ? catalyst::device::device_get_revision(f->device, &value) : catalyst::RESULT(catdv_device_get_revision(f->device, &value)); break;
         case 0x0E: r = cpp ? catalyst::device::device_has_input(f->device, &supported) : catalyst::RESULT(catdv_device_has_input(f->device, &supported)); break;
-        default: r = cpp ? catalyst::device::device_has_output(f->device, &supported) : catalyst::RESULT(catdv_device_has_output(f->device, &supported)); break;
+        case 0x0F: r = cpp ? catalyst::device::device_has_output(f->device, &supported) : catalyst::RESULT(catdv_device_has_output(f->device, &supported)); break;
+        case 0x10: {
+            const CATALYST_BYTE* bytes = 0;
+            r = cpp ? catalyst::device::display_get_edid(f->device, &bytes, &count) : catalyst::RESULT(catdv_display_get_edid(f->device, &bytes, &count));
+            if (bytes && count) supported = bytes[0];
+            break;
+        }
+        default: r = cpp ? catalyst::device::display_get_native_handle(f->device, &count) : catalyst::RESULT(catdv_display_get_native_handle(f->device, &count)); break;
     }
     catalyst::BYTE digest = (catalyst::BYTE) (count ^ supported);
     if (valid_identifier(id)) digest = (catalyst::BYTE) (digest ^ id.scheme[0] ^ id.value[0]);
@@ -47,9 +54,9 @@ int main() {
     CATDVLIB_DEVICES* snapshot = 0;
     catalyst::RESULT r = catdv_devices_enumerate(&snapshot);
     if (r.status != catalyst::STATUS_CODE_SUCCESS || !snapshot) return failed ? 1 : 2;
-    const char* labels[] = {"instance identifier", "HWID count", "HWID", "serial", "manufacturer", "product", "descriptor", "revision", "input capability", "output capability"};
+    const char* labels[] = {"instance identifier", "HWID count", "HWID", "serial", "manufacturer", "product", "descriptor", "revision", "input capability", "output capability", "cached EDID", "native display handle"};
     catalyst::NUINT count = catdv_devices_get_count(snapshot);
-    for (catalyst::BYTE field = 0x06; field <= 0x0F; ++field) {
+    for (catalyst::BYTE field = 0x06; field <= 0x11; ++field) {
         bool found = false;
         for (catalyst::NUINT j = 0; j < count; ++j) {
             DeviceFixture f = {catdv_devices_get(snapshot, j), 0, field};
@@ -57,6 +64,7 @@ int main() {
                 catalyst::NUINT ids = 0;
                 if (catdv_device_get_hwid_count(f.device, &ids).status != catalyst::STATUS_CODE_SUCCESS || !ids) continue;
             }
+            if (field >= 0x10 && !catdv_device_is_display(f.device)) continue;
             if (query(&f, false).result.status != catalyst::STATUS_CODE_SUCCESS) continue;
             print_device(j, f.device);
             perf_record(benchmark_io(labels[field - 0x06], query, &f, field, 16777216UL), &failed, &unavailable);

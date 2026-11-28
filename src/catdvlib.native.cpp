@@ -2,6 +2,10 @@
 
 CATALYST_RESULT catdv_devices_free(CATDVLIB_DEVICES* devices) {
     if (devices->data) {
+        for (catalyst::NUINT j = 0; j < devices->count; ++j) {
+            catalyst::RESULT released = catdv_display_release(&devices->data[j].display);
+            if (!CATALYST_STATUS_CODE_IS_SUCCESS(released.status)) return catalyst::RESULT(released.status, 0x02, 0x04, released.detail);
+        }
         catalyst::RESULT r = catmm_free(devices->data);
         if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return catalyst::RESULT(r.status, 0x02, 0x01, r.detail);
         devices->data = 0; devices->count = 0; devices->capacity = 0;
@@ -90,3 +94,25 @@ CATALYST_RESULT catdv_device_has_output(const CATDVLIB_DEVICE* device, CATALYST_
     return catalyst::RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x0F, 0x03, 0);
 }
 
+
+CATALYST_BOOL catdv_device_is_display(const CATDVLIB_DEVICE* device) {
+    return device->display.present;
+}
+
+CATALYST_RESULT catdv_display_get_edid(const CATDVLIB_DEVICE* device, const CATALYST_BYTE** bytes, CATALYST_NUINT* size) {
+    *bytes = 0; *size = 0;
+    if (!device->display.present) return catalyst::RESULT(CATALYST_STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED, 0x10, 0x01, 0);
+    if (device->display.edid_status != CATALYST_STATUS_CODE_SUCCESS)
+        return catalyst::RESULT(device->display.edid_status, 0x10, 0x02, 0);
+    *bytes = device->display.bytes; *size = device->display.size;
+    return catalyst::RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x10, 0x03, 0);
+}
+
+CATALYST_RESULT catdv_display_get_native_handle(const CATDVLIB_DEVICE* device, CATALYST_NUINT* handle) {
+    *handle = 0;
+    if (!device->display.present) return catalyst::RESULT(CATALYST_STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED, 0x11, 0x01, 0);
+    if (device->display.handle_status != CATALYST_STATUS_CODE_SUCCESS)
+        return catalyst::RESULT(device->display.handle_status, 0x11, 0x02, 0);
+    *handle = device->display.handle;
+    return catalyst::RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x11, 0x03, 0);
+}

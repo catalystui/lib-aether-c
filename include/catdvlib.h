@@ -89,6 +89,21 @@ CATDVLIB_API CATALYST_RESULT catdv_device_has_input(const CATDVLIB_DEVICE* devic
 /** Query whether the device exposes native output capabilities; false on failure. */
 CATDVLIB_API CATALYST_RESULT catdv_device_has_output(const CATDVLIB_DEVICE* device, CATALYST_BOOL* supported);
 
+/** Return whether this entry represents a native display endpoint. */
+CATDVLIB_API CATALYST_BOOL catdv_device_is_display(const CATDVLIB_DEVICE* device);
+
+/** Borrow the original system-provided EDID bytes until snapshot release; null/zero on failure. */
+CATDVLIB_API CATALYST_RESULT catdv_display_get_edid(const CATDVLIB_DEVICE* device, const CATALYST_BYTE** bytes, CATALYST_NUINT* size);
+
+/** Retrieve the native display handle (Win32 HMONITOR or Darwin CGDirectDisplayID); zero on failure. */
+CATDVLIB_API CATALYST_RESULT catdv_display_get_native_handle(const CATDVLIB_DEVICE* device, CATALYST_NUINT* handle);
+
+/** Find an exact scheme/value instance in a live snapshot; null on absence or ambiguity. */
+CATDVLIB_API CATALYST_RESULT catdv_devices_find_identifier(const CATDVLIB_DEVICES* devices, const CATDVLIB_IDENTIFIER* identifier, const CATDVLIB_DEVICE** device);
+
+/** Find a display by its native handle in a live snapshot; null on absence or ambiguity. */
+CATDVLIB_API CATALYST_RESULT catdv_devices_find_native_display(const CATDVLIB_DEVICES* devices, CATALYST_NUINT handle, const CATDVLIB_DEVICE** device);
+
 #ifdef __cplusplus
 } /* extern C */
 #endif

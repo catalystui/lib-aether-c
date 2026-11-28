@@ -104,6 +104,111 @@ static catalyst::STATUS_CODE catdv_win_scan(CATDVLIB_DEVICES* snapshot, CATALYST
     if (!SetupDiDestroyDeviceInfoList(list) && status == CATALYST_STATUS_CODE_SUCCESS) status = catdv_win_error(GetLastError());
     return status;
 }
+/* Resolve the exact monitor interface path, not a vendor/product substring. */
+static catalyst::STATUS_CODE catdv_win_edid(HKEY key, CATDVLIB_DISPLAY* display) {
+    DWORD type = 0, size = 0;
+    LSTATUS error = RegQueryValueExW(key, L"EDID", 0, &type, 0, &size);
+    if (error != ERROR_SUCCESS) return catdv_win_error((DWORD) error);
+    if (type != REG_BINARY) return CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT;
+    if (!size) return CATALYST_STATUS_CODE_ERROR_NOT_FOUND;
+    CATMMLIB_POINTERW memory = 0;
+    catalyst::RESULT r = catmm_alloc(&memory, (catalyst::NUINT) size);
+    if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return r.status;
+    display->bytes = (CATALYST_BYTE*) memory; /* Owned even if retrieval fails. */
+    DWORD actual = size;
+    error = RegQueryValueExW(key, L"EDID", 0, &type, (PBYTE) memory, &actual);
+    if (error != ERROR_SUCCESS) return catdv_win_error((DWORD) error);
+    if (type != REG_BINARY || actual > size) return CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT;
+    if (!actual) return CATALYST_STATUS_CODE_ERROR_NOT_FOUND;
+    display->size = (catalyst::NUINT) actual;
+    return CATALYST_STATUS_CODE_SUCCESS;
+}
+
+static void catdv_win_monitor_metadata(const WCHAR* path, CATDVLIB_DEVICE* d) {
+    HDEVINFO list = SetupDiCreateDeviceInfoList(0, 0);
+    if (list == INVALID_HANDLE_VALUE) { d->display.edid_status = catdv_win_error(GetLastError()); return; }
+    SP_DEVICE_INTERFACE_DATA iface;
+    SP_DEVINFO_DATA info;
+    catmm_fill(&iface, 0, sizeof(iface)); iface.cbSize = sizeof(iface);
+    catmm_fill(&info, 0, sizeof(info)); info.cbSize = sizeof(info);
+    union { SP_DEVICE_INTERFACE_DETAIL_DATA_W detail; CATALYST_BYTE bytes[8192]; } storage;
+    catmm_fill(&storage, 0, sizeof(storage)); storage.detail.cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
+    if (!SetupDiOpenDeviceInterfaceW(list, path, 0, &iface) ||
+        !SetupDiGetDeviceInterfaceDetailW(list, &iface, &storage.detail, sizeof(storage), 0, &info))
+        d->display.edid_status = catdv_win_error(GetLastError());
+    else {
+        catdv_win_metadata(list, &info, d);
+        HKEY key = SetupDiOpenDevRegKey(list, &info, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_QUERY_VALUE);
+        if (key == INVALID_HANDLE_VALUE) d->display.edid_status = catdv_win_error(GetLastError());
+        else {
+            d->display.edid_status = catdv_win_edid(key, &d->display);
+            LSTATUS closed = RegCloseKey(key);
+            if (closed != ERROR_SUCCESS && d->display.edid_status == CATALYST_STATUS_CODE_SUCCESS)
+                d->display.edid_status = catdv_win_error((DWORD) closed);
+        }
+    }
+    if (!SetupDiDestroyDeviceInfoList(list) && d->display.edid_status == CATALYST_STATUS_CODE_SUCCESS)
+        d->display.edid_status = catdv_win_error(GetLastError());
+}
+
+struct CATDVLIB_WIN_DISPLAYS {
+    CATDVLIB_DEVICES* snapshot;
+    catalyst::STATUS_CODE status;
+};
+
+static catalyst::STATUS_CODE catdv_win_display_entry(CATDVLIB_DEVICES* snapshot, HMONITOR handle, const WCHAR* identity,
+    catalyst::NUINT units, const DISPLAY_DEVICEW* monitor) {
+    CATDVLIB_DEVICE* d;
+    catalyst::RESULT r = catdv_native_add(snapshot, &d);
+    if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return r.status;
+    catdv_display_init(&d->display);
+    d->display.handle = (catalyst::NUINT) handle;
+    d->display.handle_status = CATALYST_STATUS_CODE_SUCCESS;
+    d->type = CATDVLIB_DEVICE_LOGICAL;
+    d->scheme = (CATALYST_ASCII) (monitor ? "windows-monitor" : "windows-display-source");
+    catdv_win_string(identity, units, &d->identifier);
+    if (d->identifier.status != CATALYST_STATUS_CODE_SUCCESS) return d->identifier.status;
+    d->capability_status = CATALYST_STATUS_CODE_SUCCESS;
+    d->output = CATALYST_TRUE;
+    if (monitor) {
+        catdv_win_monitor_metadata(identity, d);
+        if (d->descriptor.status == CATALYST_STATUS_CODE_ERROR_NOT_FOUND)
+            catdv_win_string(monitor->DeviceString, sizeof(monitor->DeviceString) / sizeof(WCHAR), &d->descriptor);
+    }
+    return CATALYST_STATUS_CODE_SUCCESS;
+}
+
+static BOOL CALLBACK catdv_win_monitor(HMONITOR handle, HDC, LPRECT, LPARAM context) {
+    CATDVLIB_WIN_DISPLAYS* scan = (CATDVLIB_WIN_DISPLAYS*) context;
+    MONITORINFOEXW info;
+    catmm_fill(&info, 0, sizeof(info)); info.cbSize = sizeof(info);
+    if (!GetMonitorInfoW(handle, (LPMONITORINFO) &info)) {
+        scan->status = catdv_win_error(GetLastError()); return FALSE;
+    }
+    bool found = false;
+    for (DWORD index = 0; ; ++index) {
+        DISPLAY_DEVICEW monitor;
+        catmm_fill(&monitor, 0, sizeof(monitor)); monitor.cb = sizeof(monitor);
+        if (!EnumDisplayDevicesW(info.szDevice, index, &monitor, EDD_GET_DEVICE_INTERFACE_NAME)) break;
+        if (!(monitor.StateFlags & DISPLAY_DEVICE_ACTIVE) || !monitor.DeviceID[0]) continue;
+        found = true;
+        scan->status = catdv_win_display_entry(scan->snapshot, handle, monitor.DeviceID,
+            sizeof(monitor.DeviceID) / sizeof(WCHAR), &monitor);
+        if (scan->status != CATALYST_STATUS_CODE_SUCCESS) return FALSE;
+    }
+    /* Virtual displays may have no monitor interface or EDID. Preserve source identity. */
+    if (!found) scan->status = catdv_win_display_entry(scan->snapshot, handle, info.szDevice,
+        sizeof(info.szDevice) / sizeof(WCHAR), 0);
+    return scan->status == CATALYST_STATUS_CODE_SUCCESS ? TRUE : FALSE;
+}
+
+static catalyst::STATUS_CODE catdv_win_displays(CATDVLIB_DEVICES* snapshot) {
+    CATDVLIB_WIN_DISPLAYS scan = { snapshot, CATALYST_STATUS_CODE_SUCCESS };
+    if (!EnumDisplayMonitors(0, 0, catdv_win_monitor, (LPARAM) &scan) && scan.status == CATALYST_STATUS_CODE_SUCCESS)
+        return CATALYST_STATUS_CODE_ERROR_IO_ERROR;
+    return scan.status;
+}
+
 CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices) {
     *devices = 0;
     CATMMLIB_POINTERW memory = 0;
@@ -112,6 +217,7 @@ CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices) {
     CATDVLIB_DEVICES* snapshot = (CATDVLIB_DEVICES*) memory;
     catalyst::STATUS_CODE status = catdv_win_scan(snapshot, CATALYST_FALSE);
     if (status == CATALYST_STATUS_CODE_SUCCESS) status = catdv_win_scan(snapshot, CATALYST_TRUE);
+    if (status == CATALYST_STATUS_CODE_SUCCESS) status = catdv_win_displays(snapshot);
     if (status != CATALYST_STATUS_CODE_SUCCESS) {
         r = catdv_devices_free(snapshot);
         if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return catalyst::RESULT(r.status, 0x01, 0x02, r.detail);

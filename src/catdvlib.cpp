@@ -74,3 +74,15 @@ CATALYST_RESULT catdv_device_has_output(const CATDVLIB_DEVICE* device, CATALYST_
     return catalyst::RESULT(catalyst::STATUS_CODE_ERROR_NOT_IMPLEMENTED, 0x0F, 0xF0, 0);
 }
 
+
+CATALYST_BOOL catdv_device_is_display(const CATDVLIB_DEVICE* device) {
+    return CATALYST_FALSE;
+}
+CATALYST_RESULT catdv_display_get_edid(const CATDVLIB_DEVICE* device, const CATALYST_BYTE** bytes, CATALYST_NUINT* size) {
+    *bytes = 0; *size = 0;
+    return catalyst::RESULT(CATALYST_STATUS_CODE_ERROR_NOT_IMPLEMENTED, 0x10, 0xF0, 0);
+}
+CATALYST_RESULT catdv_display_get_native_handle(const CATDVLIB_DEVICE* device, CATALYST_NUINT* handle) {
+    *handle = 0;
+    return catalyst::RESULT(CATALYST_STATUS_CODE_ERROR_NOT_IMPLEMENTED, 0x11, 0xF0, 0);
+}

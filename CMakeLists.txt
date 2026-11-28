@@ -104,7 +104,7 @@ add_library(catdvlib_static STATIC)
 configure_target(
     NAME catdv
     TARGETS catdvlib_shared catdvlib_static
-    SOURCES ${MODULE_SOURCE}
+    SOURCES ${MODULE_SOURCE} src/catdvlib.lookup.cpp
 )
 target_compile_definitions(catdvlib_shared PRIVATE CATDVLIB_EXPORTS INTERFACE CATDVLIB_USE_DLL)
 foreach(KIND shared static)
@@ -116,9 +116,9 @@ foreach(KIND shared static)
         target_link_libraries(${TARGET_NAME} PRIVATE Catalyst::catmm_${KIND} Catalyst::catte_${KIND})
     endif()
     if(TARGET_PLATFORM_WIN32)
-        target_link_libraries(${TARGET_NAME} PRIVATE hid setupapi)
+        target_link_libraries(${TARGET_NAME} PRIVATE hid setupapi user32 advapi32)
     elseif(TARGET_PLATFORM_DARWIN)
-        target_link_libraries(${TARGET_NAME} PRIVATE "-framework IOKit" "-framework CoreFoundation")
+        target_link_libraries(${TARGET_NAME} PRIVATE "-framework IOKit" "-framework CoreFoundation" "-framework CoreGraphics")
     endif()
     add_library(Catalyst::catdv_${KIND} ALIAS ${TARGET_NAME})
 endforeach()
