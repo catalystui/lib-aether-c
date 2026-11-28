@@ -87,7 +87,7 @@ Aether exposes `Catalyst::catsy_static` and `Catalyst::catsy_shared` to CMake so
 
 ## Verification
 
-Run `test_catsylib` to verify available query contracts, and `perf_catsylib` in Release to compare size and output queries. The performance program compares the native backend with public C and C++ entry points; independent direct native references are shown where matching output is available. The independent references do not duplicate all validation, so their timings do not isolate reporting overhead. Both programs report unavailable queries separately from failures.
+Run `test_catsylib` to verify available query contracts, and `perf_catsylib` in Release to compare size and output queries. The performance program compares the native backend with public C and C++ entry points; independent direct native references are shown where matching output is available. The independent references do not duplicate all validation, so their timings do not isolate reporting overhead. Direct native references calibrate their own sample count to accommodate especially fast operations. Both programs report unavailable queries separately from failures.
 
 ## AI-Assisted Development
 
