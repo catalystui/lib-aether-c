@@ -30,12 +30,19 @@ static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write)
                 if (report->result("digital state", r, 0x07)) {
                     report->check(state == TRUE || state == FALSE, "digital state representation");
                     if (write) {
-                        for (unsigned long attempt = 0; attempt < 100000; ++attempt) {
+                        std::time_t start = std::time(0);
+                        for (;;) {
                             r = catalyst::output::digital_set_state(output, j, state);
                             if (r.status != STATUS_CODE_SUCCESS_NOOP) break;
+                            std::time_t now = std::time(0);
+                            if (start == (std::time_t) -1 || now == (std::time_t) -1 || now < start || std::difftime(now, start) >= 5.0) break;
                         }
-                        if (r.status == STATUS_CODE_SUCCESS_NOOP) { report->skip("digital write still pending; stop submitting"); break; }
+                        if (r.status == STATUS_CODE_SUCCESS_NOOP) { report->check(false, "digital write completion not observed"); return; }
                         if (report->result("reapply digital state", r, 0x08)) {
+                            BOOL observed = FALSE;
+                            RESULT readback = catot_digital_get_state(output, j, &observed);
+                            if (report->result("digital write readback", readback, 0x07))
+                                report->check(observed == state, "digital state after native completion");
 #if TARGET_PLATFORM_LINUX
                             unsigned eventType, eventCode;
                             if (valid_identifier(id) && std::strcmp((const char*) id.scheme, "linux-evdev") == 0 &&
@@ -64,12 +71,20 @@ static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write)
                 r = catot_absolute_get_value(output, j, &value);
                 if (report->result("absolute value", r, 0x0A)) {
                     if (write) {
-                        for (unsigned long attempt = 0; attempt < 100000; ++attempt) {
+                        std::time_t start = std::time(0);
+                        for (;;) {
                             r = catalyst::output::absolute_set_value(output, j, value);
                             if (r.status != STATUS_CODE_SUCCESS_NOOP) break;
+                            std::time_t now = std::time(0);
+                            if (start == (std::time_t) -1 || now == (std::time_t) -1 || now < start || std::difftime(now, start) >= 5.0) break;
                         }
-                        if (r.status == STATUS_CODE_SUCCESS_NOOP) { report->skip("absolute write still pending; stop submitting"); break; }
-                        report->result("reapply absolute value", r, 0x0B);
+                        if (r.status == STATUS_CODE_SUCCESS_NOOP) { report->check(false, "absolute write completion not observed"); return; }
+                        if (report->result("reapply absolute value", r, 0x0B)) {
+                            INT observed = 0;
+                            RESULT readback = catot_absolute_get_value(output, j, &observed);
+                            if (report->result("absolute write readback", readback, 0x0A))
+                                report->check(observed == value, "absolute value after native completion");
+                        }
                     }
                 } else report->check(value == 0, "value failure output");
             }
@@ -83,7 +98,13 @@ static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write)
     NUINT written = 0;
     r = catot_device_write(output, &dummy, 0, &written);
     if (r.status == STATUS_CODE_ERROR_INVALID_ARGUMENT)
-        report->check(r.context == 0x03 && r.operation == 0x01 && r.detail == 2, "reject incomplete native record");
+        report->check(r.context == 0x03 &&
+#if TARGET_PLATFORM_DARWIN
+            r.operation == 0x07 &&
+#else
+            r.operation == 0x01 &&
+#endif
+            r.detail == 2, "reject incomplete native record");
     else if (r.status == STATUS_CODE_ERROR_NOT_IMPLEMENTED) report->result("native output record", r, 0x03);
     else report->check(false, "reject incomplete native record");
     report->check(!written, "failed write extent");
@@ -91,18 +112,23 @@ static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write)
 
 int main(int argc, char** argv) {
     std::printf("CATOTLIB Tests\nTarget: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
-    NUINT selected = 0;
-    bool write = argc == 3 && std::strcmp(argv[1], "--write") == 0 && parse_index(argv[2], &selected);
-    if (argc != 1 && !write) { std::printf("Usage: test_catotlib [--write DEVICE_INDEX]\n"); return 1; }
-    if (!write) std::printf("Read-only verification; --write DEVICE_INDEX explicitly enables same-value writes.\n");
+    bool write = argc == 4 && std::strcmp(argv[1], "--write") == 0;
+    if (argc != 1 && !write) { std::printf("Usage: test_catotlib [--write SCHEME INSTANCE_ID]\n"); return 1; }
+    if (!write) std::printf("Read-only verification; --write SCHEME INSTANCE_ID explicitly enables same-value writes.\n");
     TestReport report;
     CATDVLIB_DEVICES* snapshot = test_snapshot(&report);
     if (!snapshot) return report.finish();
     NUINT opened = 0, count = catdv_devices_get_count(snapshot);
-    if (write && selected >= count) report.check(false, "selected device exists");
+    bool found = false;
     for (NUINT j = 0; j < count; ++j) {
-        if (write && j != selected) continue;
         const CATDVLIB_DEVICE* d = catdv_devices_get(snapshot, j);
+        if (write) {
+            CATDVLIB_IDENTIFIER id = {0, 0};
+            if (catdv_device_get_identifier(d, &id).status != STATUS_CODE_SUCCESS ||
+                !valid_identifier(id) || std::strcmp((const char*) id.scheme, argv[2]) ||
+                std::strcmp((const char*) id.value, argv[3])) continue;
+            found = true;
+        }
         BOOL supported = FALSE;
         RESULT r = catdv_device_has_output(d, &supported);
         if (r.status != STATUS_CODE_SUCCESS || !supported) continue;
@@ -122,6 +148,7 @@ int main(int argc, char** argv) {
 #endif
         report.result("close output", r, 0x02);
     }
+    if (write) report.check(found, "selected instance exists");
     if (!opened) report.skip("no accessible output device");
     if (!write) report.skip("hardware writes not requested");
     report.result("free snapshot", catdv_devices_free(snapshot), 0x02);

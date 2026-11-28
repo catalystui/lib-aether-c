@@ -69,25 +69,26 @@ static bool drain_write(Fixture* f) {
 }
 
 int main(int argc, char** argv) {
-    NUINT selected = 0;
-    bool write = argc == 3 && std::strcmp(argv[1], "--write") == 0 && parse_index(argv[2], &selected);
-    if (argc != 1 && !write) { std::printf("Usage: perf_catotlib [--write DEVICE_INDEX]\n"); return 1; }
+    bool write = argc == 4 && std::strcmp(argv[1], "--write") == 0;
+    if (argc != 1 && !write) { std::printf("Usage: perf_catotlib [--write SCHEME INSTANCE_ID]\n"); return 1; }
     std::printf("CATOTLIB Performance (Release recommended)\nTarget: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
     std::printf("Median of three CPU-time samples; C API baseline vs equivalent C++ wrapper.\n");
-    std::printf("Read-only by default. --write DEVICE_INDEX benchmarks same-value writes on the selected snapshot entry; no guessed reports.\n");
+    std::printf("Read-only by default. --write SCHEME INSTANCE_ID benchmarks same-value writes on the selected snapshot entry; no guessed reports.\n");
     CATDVLIB_DEVICES* snapshot = 0;
     RESULT r = catdv_devices_enumerate(&snapshot);
     if (r.status != STATUS_CODE_SUCCESS || !snapshot) return 2;
     int failed = 0, unavailable = 0;
     NUINT opened = 0;
-    if (write && selected >= catdv_devices_get_count(snapshot)) {
-        std::printf("Selected device index does not exist.\n");
-        catdv_devices_free(snapshot);
-        return 1;
-    }
+    bool found = false;
     for (NUINT j = 0; j < catdv_devices_get_count(snapshot); ++j) {
-        if (write && j != selected) continue;
         const CATDVLIB_DEVICE* d = catdv_devices_get(snapshot, j);
+        if (write) {
+            CATDVLIB_IDENTIFIER id = {0, 0};
+            if (catdv_device_get_identifier(d, &id).status != STATUS_CODE_SUCCESS ||
+                !valid_identifier(id) || std::strcmp((const char*) id.scheme, argv[2]) ||
+                std::strcmp((const char*) id.value, argv[3])) continue;
+            found = true;
+        }
         BOOL supported = FALSE;
         if (catdv_device_has_output(d, &supported).status != STATUS_CODE_SUCCESS || !supported) continue;
         Fixture f;
@@ -167,6 +168,7 @@ int main(int argc, char** argv) {
         /* Benchmark one accessible device by default; avoid large or changing workloads. */
         break;
     }
+    if (write && !found) { std::printf("Selected instance not found.\n"); ++failed; }
     if (!opened) { std::printf("No accessible output device.\n"); ++unavailable; }
     if (!write) std::printf("Output write timing not requested.\n");
 #if !TARGET_PLATFORM_LINUX
