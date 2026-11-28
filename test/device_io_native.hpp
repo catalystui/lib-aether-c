@@ -5,6 +5,9 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 #include <IOKit/hid/IOHIDLib.h>
+/* Remove native Boolean macros before declaring Catalyst constants. */
+#undef TRUE
+#undef FALSE
 #endif
 #if TARGET_PLATFORM_LINUX
 #include <linux/input.h>
