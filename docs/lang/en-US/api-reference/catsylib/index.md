@@ -6,7 +6,7 @@ Provides native system identification.
 **C++ Header:** `catsylib.hpp`  
 **Namespace:** `catalyst`  
 **Library:** `catsy`  
-**Dependencies:** CATALYST (Core headers); Windows system and registry APIs, or POSIX system APIs and native `iconv`.  
+**Dependencies:** CATALYST, CATMMLIB; Windows system and registry APIs, or POSIX system APIs and native `iconv`.  
 **Specification:** [FDEFSPEC](https://catalystui.org/specifications/languages/fdefspec/)
 
 ## Usage Notes

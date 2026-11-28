@@ -63,9 +63,27 @@ cmake --preset aclang17-darwin24.6-arm64
 cmake --build --preset aclang17-darwin24.6-arm64-release
 ```
 
-Already cloned? Run `git submodule update --init --recursive` to initialize the shared build infrastructure and pinned Core headers. Presets depend on the installed toolchain and do not guarantee runtime support.
+Already cloned? Run `git submodule update --init --recursive` to initialize the shared build infrastructure. CMake retrieves the pinned Core revision automatically when no Core targets have been provided by the parent project. Presets depend on the installed toolchain and do not guarantee runtime support.
 
 The [compile workflow](https://github.com/catalystui/lib-aether-c/actions/workflows/compile.yml) provides the repository's configured build checks.
+
+### Core dependency
+
+Aether uses Core's exported CMake targets. Its default build retrieves the pinned source revision using `FetchContent`. For local development, use a Core checkout with its `cmake` submodule initialized:
+
+```powershell
+cmake --preset aclang17-darwin24.6-arm64 -DFETCHCONTENT_SOURCE_DIR_CATALYSTCORE="../lib-core-c"
+```
+
+To use an installed Core package instead, set the installed prefix and select package consumption explicitly:
+
+```powershell
+cmake --preset aclang17-darwin24.6-arm64 -DCATALYST_AETHER_USE_INSTALLED_CORE=ON -DCMAKE_PREFIX_PATH="/path/to/core/package"
+```
+
+Use a compatible target, build configuration, and toolchain. Existing parent-provided Core targets take precedence. Static Aether libraries link to static Core libraries; shared Aether libraries link to shared Core libraries. For distribution, deploy the required shared Core runtime files and ABI aliases alongside Aether's runtime files.
+
+Aether exposes `Catalyst::catsy_static` and `Catalyst::catsy_shared` to CMake source consumers. Its standalone verification programs are enabled by default only for top-level builds.
 
 ## Verification
 

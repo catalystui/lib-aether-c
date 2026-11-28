@@ -1,6 +1,7 @@
 #include "cmakecfg.h"
 #if TARGET_PLATFORM_WIN32
 #include "catsylib.internal.hpp"
+#include "catmmlib.h"
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -64,7 +65,7 @@ static STATUS_CODE catsy_version(OSVERSIONINFOEXW* version) {
     if (module == 0) return catsy_win32_status(GetLastError());
     VersionFunction function = reinterpret_cast<VersionFunction>(GetProcAddress(module, "RtlGetVersion"));
     if (function == 0) return CATALYST_STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED;
-    ZeroMemory(version, sizeof(*version));
+    catmm_fill(version, 0, (NUINT) sizeof(*version));
     version->dwOSVersionInfoSize = sizeof(*version);
     return function((OSVERSIONINFOW*) version) == 0 ? CATALYST_STATUS_CODE_SUCCESS : CATALYST_STATUS_CODE_ERROR_IO_ERROR;
 }
