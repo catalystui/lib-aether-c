@@ -11,9 +11,11 @@ static const TextCase textCases[] = {
     {"revision", 0x0D, catdv_device_get_revision, catalyst::device::device_get_revision}
 };
 
-int main() {
+int main(int argc, char** argv) {
+    bool verbose = take_verbose(&argc, &argv);
+    if (argc != 1) { std::printf("Usage: test_catdvlib [--verbose]\n"); return 1; }
     std::printf("CATDVLIB Tests\nTarget: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
-    TestReport report;
+    TestReport report(verbose);
     CATDVLIB_DEVICES* snapshot = test_snapshot(&report);
     if (!snapshot) return report.finish();
     catalyst::NUINT count = catdv_devices_get_count(snapshot);
@@ -23,8 +25,9 @@ int main() {
     for (catalyst::NUINT j = 0; j < count; ++j) {
         const CATDVLIB_DEVICE* d = catdv_devices_get(snapshot, j);
         print_device(j, d);
+        TestReport before = report;
         report.check(d && d == catalyst::device::devices_get(snapshot, j), "borrowed device / C++ parity");
-        if (!d) continue;
+        if (!d) { report.summary(before); continue; }
         CATDVLIB_DEVICE_TYPE type = catdv_device_get_type(d);
         report.check(type <= CATDVLIB_DEVICE_LOGICAL && type == catalyst::device::device_get_type(d), "device type");
         CATDVLIB_IDENTIFIER id = {0, 0}, other = {0, 0};
@@ -64,6 +67,7 @@ int main() {
         if (report.result("output capability", r, 0x0F))
             report.check(same_result(r, c) && supported == cppSupported, "output capability parity");
         else report.check(!supported, "output failure output");
+        report.summary(before);
     }
     report.result("free snapshot", catalyst::device::devices_free(snapshot), 0x02);
     snapshot = 0;

@@ -127,39 +127,46 @@ static void test_live(TestReport* report, CATINLIB_INPUT* input) {
 }
 
 int main(int argc, char** argv) {
-    bool live = argc == 4 && std::strcmp(argv[1], "--live") == 0;
+    bool verbose = take_verbose(&argc, &argv);
+    bool live = (argc == 2 || argc == 4) && std::strcmp(argv[1], "--live") == 0;
     if (argc != 1 && !live) {
-        std::printf("Usage: test_catinlib [--live SCHEME INSTANCE_ID]\n"); return 1;
+        std::printf("Usage: test_catinlib [--verbose] [--live [SCHEME INSTANCE_ID]]\n"); return 1;
     }
     std::printf("CATINLIB Tests\nTarget: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
-    TestReport report;
+    TestReport report(verbose);
     CATDVLIB_DEVICES* snapshot = test_snapshot(&report);
     if (!snapshot) return report.finish();
+    const CATDVLIB_DEVICE* selected = 0;
+    if (live) {
+        selected = select_device(snapshot, true, argc == 4 ? argv[2] : 0, argc == 4 ? argv[3] : 0);
+        if (!selected) {
+            report.skip("no device selected");
+            report.result("free snapshot", catdv_devices_free(snapshot), 0x02);
+            return report.finish();
+        }
+    }
     catalyst::NUINT opened = 0;
     for (catalyst::NUINT j = 0; j < catdv_devices_get_count(snapshot); ++j) {
         const CATDVLIB_DEVICE* d = catdv_devices_get(snapshot, j);
-        if (live) {
-            CATDVLIB_IDENTIFIER id = {0, 0};
-            if (catdv_device_get_identifier(d, &id).status != catalyst::STATUS_CODE_SUCCESS ||
-                !valid_identifier(id) || std::strcmp((const char*) id.scheme, argv[2]) ||
-                std::strcmp((const char*) id.value, argv[3])) continue;
-        }
+        if (selected && d != selected) continue;
         catalyst::BOOL supported = catalyst::FALSE;
         catalyst::RESULT r = catdv_device_has_input(d, &supported);
         if (r.status != catalyst::STATUS_CODE_SUCCESS || !supported) continue;
         print_device(j, d);
+        TestReport before = report;
         CATINLIB_INPUT* input = 0;
         r = catin_device_open(d, &input);
         bool ok = report.result("open input", r, 0x01);
         report.check((r.status == catalyst::STATUS_CODE_SUCCESS) == (input != 0), "input ownership");
-        if (!ok || !input) continue;
+        if (!ok || !input) { report.summary(before); continue; }
         ++opened;
         if (live) test_live(&report, input);
         else test_input(&report, input);
         report.result("close input", catalyst::input::device_close(input), 0x02);
+        report.summary(before);
     }
     if (!opened) report.skip("no accessible input device");
-    if (!live) report.skip("interactive live delivery not requested; use --live SCHEME INSTANCE_ID");
+    if (!live) report.skip("interactive live delivery not requested; use --live");
     report.result("free snapshot", catdv_devices_free(snapshot), 0x02);
     return report.finish();
 }

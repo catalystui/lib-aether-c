@@ -111,33 +111,37 @@ static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write)
 }
 
 int main(int argc, char** argv) {
+    bool verbose = take_verbose(&argc, &argv);
     std::printf("CATOTLIB Tests\nTarget: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
-    bool write = argc == 4 && std::strcmp(argv[1], "--write") == 0;
-    if (argc != 1 && !write) { std::printf("Usage: test_catotlib [--write SCHEME INSTANCE_ID]\n"); return 1; }
-    if (!write) std::printf("Read-only verification; --write SCHEME INSTANCE_ID explicitly enables same-value writes.\n");
-    TestReport report;
+    bool write = (argc == 2 || argc == 4) && std::strcmp(argv[1], "--write") == 0;
+    if (argc != 1 && !write) { std::printf("Usage: test_catotlib [--verbose] [--write [SCHEME INSTANCE_ID]]\n"); return 1; }
+    if (!write) std::printf("Read-only verification; --write selects a device for same-value writes.\n");
+    TestReport report(verbose);
     CATDVLIB_DEVICES* snapshot = test_snapshot(&report);
     if (!snapshot) return report.finish();
+    const CATDVLIB_DEVICE* selected = 0;
+    if (write) {
+        selected = select_device(snapshot, false, argc == 4 ? argv[2] : 0, argc == 4 ? argv[3] : 0);
+        if (!selected) {
+            report.skip("no device selected");
+            report.result("free snapshot", catdv_devices_free(snapshot), 0x02);
+            return report.finish();
+        }
+    }
     catalyst::NUINT opened = 0, count = catdv_devices_get_count(snapshot);
-    bool found = false;
     for (catalyst::NUINT j = 0; j < count; ++j) {
         const CATDVLIB_DEVICE* d = catdv_devices_get(snapshot, j);
-        if (write) {
-            CATDVLIB_IDENTIFIER id = {0, 0};
-            if (catdv_device_get_identifier(d, &id).status != catalyst::STATUS_CODE_SUCCESS ||
-                !valid_identifier(id) || std::strcmp((const char*) id.scheme, argv[2]) ||
-                std::strcmp((const char*) id.value, argv[3])) continue;
-            found = true;
-        }
+        if (selected && d != selected) continue;
         catalyst::BOOL supported = catalyst::FALSE;
         catalyst::RESULT r = catdv_device_has_output(d, &supported);
         if (r.status != catalyst::STATUS_CODE_SUCCESS || !supported) continue;
         print_device(j, d);
+        TestReport before = report;
         CATOTLIB_OUTPUT* output = 0;
         r = catot_device_open(d, &output);
         bool ok = report.result("open output", r, 0x01);
         report.check((r.status == catalyst::STATUS_CODE_SUCCESS) == (output != 0), "output ownership");
-        if (!ok || !output) continue;
+        if (!ok || !output) { report.summary(before); continue; }
         ++opened;
         test_output(&report, output, write);
         r = catalyst::output::device_close(output);
@@ -147,8 +151,8 @@ int main(int argc, char** argv) {
             r = catalyst::output::device_close(output);
 #endif
         report.result("close output", r, 0x02);
+        report.summary(before);
     }
-    if (write) report.check(found, "selected instance exists");
     if (!opened) report.skip("no accessible output device");
     if (!write) report.skip("hardware writes not requested");
     report.result("free snapshot", catdv_devices_free(snapshot), 0x02);
