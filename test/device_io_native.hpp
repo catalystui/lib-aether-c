@@ -1,6 +1,5 @@
 #ifndef DEVICE_IO_NATIVE_HPP
 #define DEVICE_IO_NATIVE_HPP
-/* Native SDK declarations must precede the test helper's Catalyst namespace imports. */
 #if TARGET_PLATFORM_DARWIN
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
@@ -49,7 +48,7 @@ struct NativeState {
     }
     bool open(const CATDVLIB_DEVICE* d, const CATDVLIB_IDENTIFIER& channel) {
         CATDVLIB_IDENTIFIER id = {0, 0};
-        if (catdv_device_get_identifier(d, &id).status != STATUS_CODE_SUCCESS ||
+        if (catdv_device_get_identifier(d, &id).status != catalyst::STATUS_CODE_SUCCESS ||
             !valid_identifier(id) || !valid_identifier(channel)) return false;
 #if TARGET_PLATFORM_DARWIN
         if (std::strcmp((const char*) id.scheme, "darwin-hid") ||
@@ -96,19 +95,19 @@ struct NativeState {
 #endif
     }
 #if CATALYST_SUPPORTS_32BIT
-    bool read(bool range, bool digital, INT* a, INT* b) {
+    bool read(bool range, bool digital, catalyst::INT* a, catalyst::INT* b) {
         *a = *b = 0;
 #if TARGET_PLATFORM_DARWIN
         if (range) {
             CFIndex low = IOHIDElementGetLogicalMin(element), high = IOHIDElementGetLogicalMax(element);
             if (low < CATALYST_INT_MIN || high > CATALYST_INT_MAX || low > high) return false;
-            *a = (INT) low; *b = (INT) high; return true;
+            *a = (catalyst::INT) low; *b = (catalyst::INT) high; return true;
         }
         IOHIDValueRef value = 0;
         if (IOHIDDeviceGetValue(device, element, &value) != kIOReturnSuccess || !value) return false;
         CFIndex n = IOHIDValueGetIntegerValue(value);
         if (n < CATALYST_INT_MIN || n > CATALYST_INT_MAX) return false;
-        *a = digital ? (n ? 1 : 0) : (INT) n;
+        *a = digital ? (n ? 1 : 0) : (catalyst::INT) n;
         return true;
 #elif TARGET_PLATFORM_LINUX
         if (digital) {
@@ -133,22 +132,22 @@ struct NativeState {
 
 #if CATALYST_SUPPORTS_32BIT
 static inline void benchmark_native_state(const CATDVLIB_DEVICE* device, const CATDVLIB_IDENTIFIER& channel,
-    bool output, bool range, bool digital, INT expectedA, INT expectedB, double catalystNs) {
+    bool output, bool range, bool digital, catalyst::INT expectedA, catalyst::INT expectedB, double catalystNs) {
     NativeState native(output);
-    INT a = 0, b = 0;
+    catalyst::INT a = 0, b = 0;
     if (!native.open(device, channel) || !native.read(range, digital, &a, &b) ||
         a != expectedA || b != expectedB) {
         std::printf("  Direct native reference unavailable or value changed during preflight.\n"); return;
     }
     unsigned long calls = 1;
     double samples[3] = {0, 0, 0};
-    for (BYTE sample = 0; sample < 3; ++sample) {
+    for (catalyst::BYTE sample = 0; sample < 3; ++sample) {
         for (;;) {
             std::clock_t start = std::clock();
             if (start == (std::clock_t) -1) return;
             for (unsigned long j = 0; j < calls; ++j) {
                 if (!native.read(range, digital, &a, &b)) { std::printf("  Native reference interrupted.\n"); return; }
-                device_io_sink = (BYTE) (device_io_sink ^ (BYTE) a ^ (BYTE) b);
+                device_io_sink = (catalyst::BYTE) (device_io_sink ^ (catalyst::BYTE) a ^ (catalyst::BYTE) b);
             }
             std::clock_t end = std::clock();
             if (end == (std::clock_t) -1 || end < start) return;
@@ -182,7 +181,7 @@ static inline void benchmark_native_discovery() {
             if (!manager) return;
             IOHIDManagerSetDeviceMatching(manager, 0);
             CFSetRef devices = IOHIDManagerCopyDevices(manager);
-            if (devices) { device_io_sink ^= (BYTE) CFSetGetCount(devices); CFRelease(devices); }
+            if (devices) { device_io_sink ^= (catalyst::BYTE) CFSetGetCount(devices); CFRelease(devices); }
             CFRelease(manager);
         }
         std::clock_t end = std::clock();

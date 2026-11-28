@@ -6,7 +6,6 @@
 #include <ctime>
 #include "catdvlib.hpp"
 
-using namespace catalyst;
 
 struct TestReport {
     unsigned long passed, failed, skipped;
@@ -17,14 +16,14 @@ struct TestReport {
         else { ++failed; std::printf("FAIL: %s\n", name); }
     }
     void skip(const char* name) { ++skipped; std::printf("SKIP: %s\n", name); }
-    bool result(const char* name, RESULT r, BYTE context, bool allowNoop = false) {
+    bool result(const char* name, catalyst::RESULT r, catalyst::BYTE context, bool allowNoop = false) {
         if (r.context != context || r.operation == 0) {
             check(false, name);
-        } else if (r.status == STATUS_CODE_SUCCESS || (allowNoop && r.status == STATUS_CODE_SUCCESS_NOOP)) {
+        } else if (r.status == catalyst::STATUS_CODE_SUCCESS || (allowNoop && r.status == catalyst::STATUS_CODE_SUCCESS_NOOP)) {
             check(r.detail == 0, name);
             return r.detail == 0;
-        } else if (r.status == STATUS_CODE_ERROR_NOT_FOUND || r.status == STATUS_CODE_ERROR_ACCESS_DENIED ||
-                   r.status == STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED || r.status == STATUS_CODE_ERROR_NOT_IMPLEMENTED) {
+        } else if (r.status == catalyst::STATUS_CODE_ERROR_NOT_FOUND || r.status == catalyst::STATUS_CODE_ERROR_ACCESS_DENIED ||
+                   r.status == catalyst::STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED || r.status == catalyst::STATUS_CODE_ERROR_NOT_IMPLEMENTED) {
             skip(name);
         } else {
             check(false, name);
@@ -39,7 +38,7 @@ struct TestReport {
     }
 };
 
-static inline bool same_result(RESULT a, RESULT b) {
+static inline bool same_result(catalyst::RESULT a, catalyst::RESULT b) {
     return a.status == b.status && a.context == b.context &&
         a.operation == b.operation && a.detail == b.detail;
 }
@@ -53,24 +52,24 @@ static inline bool same_identifier(const CATDVLIB_IDENTIFIER& a, const CATDVLIB_
         std::strcmp((const char*) a.value, (const char*) b.value) == 0;
 }
 
-static inline void print_device(NUINT index, const CATDVLIB_DEVICE* d) {
+static inline void print_device(catalyst::NUINT index, const CATDVLIB_DEVICE* d) {
     CATDVLIB_IDENTIFIER id = {0, 0};
-    RESULT r = catdv_device_get_identifier(d, &id);
+    catalyst::RESULT r = catdv_device_get_identifier(d, &id);
     std::printf("\nDevice %lu", (unsigned long) index);
-    if (r.status == STATUS_CODE_SUCCESS && valid_identifier(id))
+    if (r.status == catalyst::STATUS_CODE_SUCCESS && valid_identifier(id))
         std::printf(" [%s] %s", (const char*) id.scheme, (const char*) id.value);
     std::printf("\n");
 }
 
 /* Device indices are snapshot-local. No implicit write target. */
-static inline bool parse_index(const char* text, NUINT* index) {
+static inline bool parse_index(const char* text, catalyst::NUINT* index) {
     if (!*text) return false;
-    NUINT n = 0;
+    catalyst::NUINT n = 0;
     while (*text) {
         if (*text < '0' || *text > '9') return false;
-        BYTE digit = (BYTE) (*text++ - '0');
+        catalyst::BYTE digit = (catalyst::BYTE) (*text++ - '0');
         if (n > (CATALYST_NUINT_MAX - digit) / 10) return false;
-        n = (NUINT) (n * 10 + digit);
+        n = (catalyst::NUINT) (n * 10 + digit);
     }
     *index = n;
     return true;
@@ -78,38 +77,38 @@ static inline bool parse_index(const char* text, NUINT* index) {
 
 static inline CATDVLIB_DEVICES* test_snapshot(TestReport* report) {
     CATDVLIB_DEVICES* snapshot = 0;
-    RESULT r = catdv_devices_enumerate(&snapshot);
+    catalyst::RESULT r = catdv_devices_enumerate(&snapshot);
     bool ok = report->result("enumerate devices", r, 0x01);
-    report->check((r.status == STATUS_CODE_SUCCESS) == (snapshot != 0), "snapshot ownership");
+    report->check((r.status == catalyst::STATUS_CODE_SUCCESS) == (snapshot != 0), "snapshot ownership");
     return ok ? snapshot : 0;
 }
 
 /* Timing follows the existing CATSYLIB CPU-time convention. Count no-ops
  * separately: polling rate is not physical device throughput. */
 struct PerfOutcome {
-    RESULT result;
-    BYTE digest;
-    PerfOutcome(RESULT r, BYTE d) : result(r), digest(d) {}
+    catalyst::RESULT result;
+    catalyst::BYTE digest;
+    PerfOutcome(catalyst::RESULT r, catalyst::BYTE d) : result(r), digest(d) {}
 };
 typedef PerfOutcome (*PerfCall)(void*, bool);
 struct PerfSample {
     double seconds;
     unsigned long complete, noop;
 };
-static volatile BYTE device_io_sink = 0;
+static volatile catalyst::BYTE device_io_sink = 0;
 
 static inline bool measure_io(PerfCall call, void* fixture, bool cpp, unsigned long calls,
-                              BYTE context, PerfSample* sample) {
+                              catalyst::BYTE context, PerfSample* sample) {
     sample->complete = sample->noop = 0;
     std::clock_t begin = std::clock();
     if (begin == (std::clock_t) -1) return false;
     for (unsigned long j = 0; j < calls; ++j) {
         PerfOutcome value = call(fixture, cpp);
-        RESULT r = value.result;
-        device_io_sink = (BYTE) (device_io_sink ^ r.status ^ r.context ^ r.operation ^ r.detail ^ value.digest);
+        catalyst::RESULT r = value.result;
+        device_io_sink = (catalyst::BYTE) (device_io_sink ^ r.status ^ r.context ^ r.operation ^ r.detail ^ value.digest);
         if (r.context != context || r.operation == 0 || r.detail != 0) return false;
-        if (r.status == STATUS_CODE_SUCCESS) ++sample->complete;
-        else if (r.status == STATUS_CODE_SUCCESS_NOOP) ++sample->noop;
+        if (r.status == catalyst::STATUS_CODE_SUCCESS) ++sample->complete;
+        else if (r.status == catalyst::STATUS_CODE_SUCCESS_NOOP) ++sample->noop;
         else {
             std::printf("    Result: %02X %02X %02X %02X\n", (unsigned) r.status,
                 (unsigned) r.context, (unsigned) r.operation, (unsigned) r.detail);
@@ -128,7 +127,7 @@ static inline PerfSample median_io(PerfSample* samples) {
     return samples[0].seconds > samples[1].seconds ? samples[0] : samples[1];
 }
 
-static inline int benchmark_io(const char* name, PerfCall call, void* fixture, BYTE context,
+static inline int benchmark_io(const char* name, PerfCall call, void* fixture, catalyst::BYTE context,
                               unsigned long limit, bool stable = true, double* cNanoseconds = 0) {
     if (cNanoseconds) *cNanoseconds = 0;
     std::printf("\n%s\n", name);
@@ -137,16 +136,16 @@ static inline int benchmark_io(const char* name, PerfCall call, void* fixture, B
         !a.result.operation || !b.result.operation) {
         std::printf("  FAIL: result context/operation\n"); return 1;
     }
-    if ((a.result.status != STATUS_CODE_SUCCESS && a.result.status != STATUS_CODE_SUCCESS_NOOP) ||
-        (b.result.status != STATUS_CODE_SUCCESS && b.result.status != STATUS_CODE_SUCCESS_NOOP)) {
+    if ((a.result.status != catalyst::STATUS_CODE_SUCCESS && a.result.status != catalyst::STATUS_CODE_SUCCESS_NOOP) ||
+        (b.result.status != catalyst::STATUS_CODE_SUCCESS && b.result.status != catalyst::STATUS_CODE_SUCCESS_NOOP)) {
         std::printf("  Unavailable or failed: C %02X, C++ %02X\n",
             (unsigned) a.result.status, (unsigned) b.result.status);
-        STATUS_CODE statuses[] = {a.result.status, b.result.status};
-        for (BYTE j = 0; j < 2; ++j) {
-            STATUS_CODE s = statuses[j];
-            if (s != STATUS_CODE_SUCCESS && s != STATUS_CODE_SUCCESS_NOOP &&
-                s != STATUS_CODE_ERROR_NOT_FOUND && s != STATUS_CODE_ERROR_ACCESS_DENIED &&
-                s != STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED && s != STATUS_CODE_ERROR_NOT_IMPLEMENTED)
+        catalyst::STATUS_CODE statuses[] = {a.result.status, b.result.status};
+        for (catalyst::BYTE j = 0; j < 2; ++j) {
+            catalyst::STATUS_CODE s = statuses[j];
+            if (s != catalyst::STATUS_CODE_SUCCESS && s != catalyst::STATUS_CODE_SUCCESS_NOOP &&
+                s != catalyst::STATUS_CODE_ERROR_NOT_FOUND && s != catalyst::STATUS_CODE_ERROR_ACCESS_DENIED &&
+                s != catalyst::STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED && s != catalyst::STATUS_CODE_ERROR_NOT_IMPLEMENTED)
                 return 1;
         }
         return 2;
@@ -162,9 +161,9 @@ static inline int benchmark_io(const char* name, PerfCall call, void* fixture, B
         calls = calls > limit / 2 ? limit : calls * 2;
     }
     PerfSample samples[2][3];
-    for (BYTE j = 0; j < 3; ++j)
-        for (BYTE k = 0; k < 2; ++k) {
-            BYTE mode = (j & 1) ? (BYTE) (1 - k) : k;
+    for (catalyst::BYTE j = 0; j < 3; ++j)
+        for (catalyst::BYTE k = 0; k < 2; ++k) {
+            catalyst::BYTE mode = (j & 1) ? (catalyst::BYTE) (1 - k) : k;
             if (!measure_io(call, fixture, mode != 0, calls, context, &samples[mode][j])) return 1;
         }
     PerfSample c = median_io(samples[0]), cpp = median_io(samples[1]);
@@ -172,7 +171,7 @@ static inline int benchmark_io(const char* name, PerfCall call, void* fixture, B
         *cNanoseconds = c.seconds * 1e9 / calls;
     PerfSample values[] = {c, cpp};
     const char* labels[] = {"Catalyst C", "Catalyst C++"};
-    for (BYTE j = 0; j < 2; ++j) {
+    for (catalyst::BYTE j = 0; j < 2; ++j) {
         PerfSample s = values[j];
         std::printf("  %-13s %lu calls, %lu completed, %lu no-op", labels[j], calls, s.complete, s.noop);
         if (s.seconds >= 0.001 && s.seconds * CLOCKS_PER_SEC >= 20) {

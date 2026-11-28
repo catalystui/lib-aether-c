@@ -29,12 +29,9 @@
 #endif
 #endif
 
-using catalyst::NUINT;
-using catalyst::UTF8W;
-using catalyst::RESULT;
 
-typedef CATALYST_RESULT (*Query)(UTF8W, NUINT, NUINT*);
-typedef RESULT (*QueryCpp)(UTF8W, NUINT, NUINT*);
+typedef CATALYST_RESULT (*Query)(catalyst::UTF8W, catalyst::NUINT, catalyst::NUINT*);
+typedef catalyst::RESULT (*QueryCpp)(catalyst::UTF8W, catalyst::NUINT, catalyst::NUINT*);
 
 struct Benchmark {
     const char* name;
@@ -55,10 +52,10 @@ static const Benchmark benchmarks[] = {
 #if defined(CLOCKS_PER_SEC)
 // Independent native C reference. Fixed scratch extents keep the reference
 // simple; a value that does not fit or cannot be matched is not benchmarked.
-static bool native_copy(const char* value, UTF8W output, NUINT capacity, NUINT* required) {
+static bool native_copy(const char* value, catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
     size_t length = std::strlen(value);
     if (length == 0 || length >= CATALYST_NUINT_MAX) return false;
-    *required = (NUINT) (length + 1);
+    *required = (catalyst::NUINT) (length + 1);
     if (output == 0) return capacity == 0;
     if (capacity < *required) return false;
     std::memcpy(output, value, (size_t) *required);
@@ -68,7 +65,7 @@ static bool native_copy(const char* value, UTF8W output, NUINT capacity, NUINT* 
 #if TARGET_PLATFORM_LINUX
 // Accept common unescaped os-release assignments. More complicated valid
 // assignments are handled by CATSYLIB but not by this benchmark reference.
-static bool native_distribution(CATSYLIB_FIELD field, UTF8W output, NUINT capacity, NUINT* required) {
+static bool native_distribution(CATSYLIB_FIELD field, catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
     FILE* file = std::fopen("/etc/os-release", "r");
     if (file == 0 && errno == ENOENT) file = std::fopen("/usr/lib/os-release", "r");
     if (file == 0) return false;
@@ -103,11 +100,11 @@ static bool native_distribution(CATSYLIB_FIELD field, UTF8W output, NUINT capaci
 #endif
 
 #if TARGET_PLATFORM_WIN32
-static bool native_wide(const WCHAR* value, UTF8W output, NUINT capacity, NUINT* required) {
+static bool native_wide(const WCHAR* value, catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
     if (*value == 0) return false;
     int bytes = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, -1, 0, 0, 0, 0);
     if (bytes <= 0 || (size_t) bytes > CATALYST_NUINT_MAX) return false;
-    *required = (NUINT) bytes;
+    *required = (catalyst::NUINT) bytes;
     if (output == 0) return capacity == 0;
     if (capacity < *required) return false;
     return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, -1, (char*) output, bytes, 0, 0) == bytes;
@@ -124,7 +121,7 @@ static bool native_version(OSVERSIONINFOEXW* version) {
     return function((OSVERSIONINFOW*) version) == 0;
 }
 
-static bool native_registry(CATSYLIB_FIELD field, UTF8W output, NUINT capacity, NUINT* required) {
+static bool native_registry(CATSYLIB_FIELD field, catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
     HKEY key = 0;
     if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
         0, KEY_QUERY_VALUE | KEY_WOW64_64KEY, &key) != ERROR_SUCCESS) return false;
@@ -166,7 +163,7 @@ static const char* native_architecture() {
 }
 #endif
 
-static bool native_query(CATSYLIB_FIELD field, UTF8W output, NUINT capacity, NUINT* required) {
+static bool native_query(CATSYLIB_FIELD field, catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
 #if TARGET_PLATFORM_LINUX || TARGET_PLATFORM_DARWIN
 #if TARGET_PLATFORM_LINUX
     if (field == CATSYLIB_FIELD_DISTRIBUTION || field == CATSYLIB_FIELD_DISTRIBUTION_VERSION)
@@ -239,8 +236,8 @@ static bool native_query(CATSYLIB_FIELD field, UTF8W output, NUINT capacity, NUI
 
 static volatile CATALYST_BYTE sink = 0;
 
-static bool invoke(const Benchmark& benchmark, unsigned int mode, UTF8W output, NUINT capacity,
-    NUINT* required, bool sizeOnly) {
+static bool invoke(const Benchmark& benchmark, unsigned int mode, catalyst::UTF8W output, catalyst::NUINT capacity,
+    catalyst::NUINT* required, bool sizeOnly) {
     *required = 0;
     if (mode == 3) return native_query(benchmark.field, output, capacity, required);
     CATALYST_RESULT result;
@@ -257,14 +254,14 @@ static bool invoke(const Benchmark& benchmark, unsigned int mode, UTF8W output, 
         result.operation == operation && result.detail == 0;
 }
 
-static bool measure(const Benchmark& benchmark, unsigned int mode, UTF8W output, NUINT capacity,
-    NUINT expected, unsigned long calls, bool sizeOnly, double* seconds) {
+static bool measure(const Benchmark& benchmark, unsigned int mode, catalyst::UTF8W output, catalyst::NUINT capacity,
+    catalyst::NUINT expected, unsigned long calls, bool sizeOnly, double* seconds) {
     std::clock_t start = std::clock();
     if (start == (std::clock_t) -1) return false;
     for (unsigned long i = 0; i < calls; ++i) {
-        NUINT required;
+        catalyst::NUINT required;
         if (!invoke(benchmark, mode, output, capacity, &required, sizeOnly) || required != expected) return false;
-        if (!sizeOnly) sink = (CATALYST_BYTE) (sink ^ output[0] ^ output[required - (NUINT) 1]);
+        if (!sizeOnly) sink = (CATALYST_BYTE) (sink ^ output[0] ^ output[required - (catalyst::NUINT) 1]);
         else sink = (CATALYST_BYTE) (sink ^ (CATALYST_BYTE) required);
     }
     std::clock_t end = std::clock();
@@ -279,11 +276,11 @@ static double median(double* values) {
     return values[0] > values[1] ? values[0] : values[1];
 }
 
-static int benchmark_case(const Benchmark& benchmark, bool sizeOnly, UTF8W output, UTF8W reference, NUINT expected) {
-    UTF8W destination = sizeOnly ? 0 : output;
-    NUINT capacity = sizeOnly ? 0 : expected;
+static int benchmark_case(const Benchmark& benchmark, bool sizeOnly, catalyst::UTF8W output, catalyst::UTF8W reference, catalyst::NUINT expected) {
+    catalyst::UTF8W destination = sizeOnly ? 0 : output;
+    catalyst::NUINT capacity = sizeOnly ? 0 : expected;
     unsigned int modes = 3;
-    NUINT required = 0;
+    catalyst::NUINT required = 0;
     if (native_query(benchmark.field, output, expected, &required) &&
         required == expected && std::memcmp(output, reference, (size_t) expected) == 0) modes = 4;
     for (unsigned int mode = 0; mode < modes; ++mode) {
@@ -370,15 +367,15 @@ int main() {
     for (CATALYST_BYTE i = 0; i < sizeof(benchmarks) / sizeof(benchmarks[0]); ++i) {
         const Benchmark& benchmark = benchmarks[i];
         std::printf("\n%s\n", benchmark.name);
-        NUINT required = 0;
+        catalyst::NUINT required = 0;
         if (!invoke(benchmark, 1, 0, 0, &required, true) || required == 0) {
             std::printf("  Query unavailable or failed; run test_catsylib for status details.\n");
             ++unavailable;
             continue;
         }
-        UTF8W output = (UTF8W) std::malloc((size_t) required);
-        UTF8W reference = (UTF8W) std::malloc((size_t) required);
-        NUINT actual = 0;
+        catalyst::UTF8W output = (catalyst::UTF8W) std::malloc((size_t) required);
+        catalyst::UTF8W reference = (catalyst::UTF8W) std::malloc((size_t) required);
+        catalyst::NUINT actual = 0;
         if (output == 0 || reference == 0 || !invoke(benchmark, 1, reference, required, &actual, false) || actual != required) {
             std::printf("  FAIL: fixture initialization\n");
             ++failed;

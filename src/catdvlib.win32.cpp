@@ -2,7 +2,7 @@
 #include "catio.win32.hpp"
 #include <setupapi.h>
 
-static void catdv_win_string(const WCHAR* value, NUINT units, CATDVLIB_NATIVE_TEXT* text) {
+static void catdv_win_string(const WCHAR* value, catalyst::NUINT units, CATDVLIB_NATIVE_TEXT* text) {
     text->status = catio_win_utf8(value, units, text->value, sizeof(text->value));
 }
 static void catdv_win_property(HDEVINFO list, SP_DEVINFO_DATA* info, DWORD property, CATDVLIB_NATIVE_TEXT* text) {
@@ -29,9 +29,9 @@ static void catdv_win_metadata(HDEVINFO list, SP_DEVINFO_DATA* info, CATDVLIB_DE
         return;
     }
     if (type != REG_MULTI_SZ || bytes % sizeof(WCHAR) || bytes > sizeof(ids)) { d->hwid_status = CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT; return; }
-    NUINT extent = bytes / sizeof(WCHAR), pos = 0;
+    catalyst::NUINT extent = bytes / sizeof(WCHAR), pos = 0;
     while (pos < extent && ids[pos]) {
-        NUINT end = pos;
+        catalyst::NUINT end = pos;
         while (end < extent && ids[end]) ++end;
         if (end == extent) { d->hwid_status = CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT; return; }
         if (d->hwid_count == 16) { d->hwid_status = CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW; return; }
@@ -57,19 +57,19 @@ static void catdv_win_hid(HANDLE handle, CATDVLIB_DEVICE* d) {
     catmm_fill(value, 0, sizeof(value));
     if (HidD_GetSerialNumberString(handle, value, sizeof(value))) catdv_win_string(value, 256, &d->serial);
 }
-static STATUS_CODE catdv_win_scan(CATDVLIB_DEVICES* snapshot, CATALYST_BOOL hid) {
+static catalyst::STATUS_CODE catdv_win_scan(CATDVLIB_DEVICES* snapshot, CATALYST_BOOL hid) {
     GUID guid;
     HidD_GetHidGuid(&guid);
     HDEVINFO list = SetupDiGetClassDevsW(hid ? &guid : 0, 0, 0, DIGCF_PRESENT |
         (hid ? DIGCF_DEVICEINTERFACE : DIGCF_ALLCLASSES));
     if (list == INVALID_HANDLE_VALUE) return catio_win_error(GetLastError());
-    STATUS_CODE status = CATALYST_STATUS_CODE_SUCCESS;
+    catalyst::STATUS_CODE status = CATALYST_STATUS_CODE_SUCCESS;
     for (DWORD index = 0; ; ++index) {
         SP_DEVINFO_DATA info; catmm_fill(&info, 0, sizeof(info)); info.cbSize = sizeof(info);
         WCHAR instance[1024];
         /* Aligned native variable-size detail buffer, no unbounded stack cast. */
         union { SP_DEVICE_INTERFACE_DETAIL_DATA_W detail; CATALYST_BYTE bytes[8192]; } storage;
-        const WCHAR* identity = instance; NUINT units = 1024;
+        const WCHAR* identity = instance; catalyst::NUINT units = 1024;
         if (hid) {
             SP_DEVICE_INTERFACE_DATA iface; catmm_fill(&iface, 0, sizeof(iface)); iface.cbSize = sizeof(iface);
             if (!SetupDiEnumDeviceInterfaces(list, 0, &guid, index, &iface)) {
@@ -88,7 +88,7 @@ static STATUS_CODE catdv_win_scan(CATDVLIB_DEVICES* snapshot, CATALYST_BOOL hid)
             if (!SetupDiGetDeviceInstanceIdW(list, &info, instance, 1024, 0)) { status = catio_win_error(GetLastError()); break; }
         }
         CATDVLIB_DEVICE* d;
-        RESULT r = catdv_native_add(snapshot, &d);
+        catalyst::RESULT r = catdv_native_add(snapshot, &d);
         if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) { status = r.status; break; }
         d->scheme = (CATALYST_ASCII) (hid ? "windows-hid" : "windows-pnp");
         d->type = hid ? CATDVLIB_DEVICE_LOGICAL : CATDVLIB_DEVICE_UNKNOWN;
@@ -107,16 +107,16 @@ static STATUS_CODE catdv_win_scan(CATDVLIB_DEVICES* snapshot, CATALYST_BOOL hid)
 CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices) {
     *devices = 0;
     CATMMLIB_POINTERW memory = 0;
-    RESULT r = catmm_alloc(&memory, sizeof(CATDVLIB_DEVICES));
-    if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return RESULT(r.status, 0x01, 0x01, r.detail);
+    catalyst::RESULT r = catmm_alloc(&memory, sizeof(CATDVLIB_DEVICES));
+    if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return catalyst::RESULT(r.status, 0x01, 0x01, r.detail);
     CATDVLIB_DEVICES* snapshot = (CATDVLIB_DEVICES*) memory;
-    STATUS_CODE status = catdv_win_scan(snapshot, CATALYST_FALSE);
+    catalyst::STATUS_CODE status = catdv_win_scan(snapshot, CATALYST_FALSE);
     if (status == CATALYST_STATUS_CODE_SUCCESS) status = catdv_win_scan(snapshot, CATALYST_TRUE);
     if (status != CATALYST_STATUS_CODE_SUCCESS) {
         r = catdv_devices_free(snapshot);
-        if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return RESULT(r.status, 0x01, 0x02, r.detail);
-        return RESULT(status, 0x01, 0x03, 0);
+        if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return catalyst::RESULT(r.status, 0x01, 0x02, r.detail);
+        return catalyst::RESULT(status, 0x01, 0x03, 0);
     }
     *devices = snapshot;
-    return RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x01, 0x06, 0);
+    return catalyst::RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x01, 0x06, 0);
 }
