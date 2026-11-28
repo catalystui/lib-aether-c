@@ -41,26 +41,55 @@ int main() {
     if (r.status != catalyst::STATUS_CODE_SUCCESS || !snapshot) return 2;
     int failed = 0, unavailable = 0;
     catalyst::NUINT opened = 0;
+    bool lifecycleDone = false, countDone = false, metadataDone = false;
+    bool digital = false;
+#if CATALYST_SUPPORTS_32BIT
+    bool absolute = false, relative = false;
+#endif
+    bool rawDone = false;
     for (catalyst::NUINT j = 0; j < catdv_devices_get_count(snapshot); ++j) {
         const CATDVLIB_DEVICE* d = catdv_devices_get(snapshot, j);
         catalyst::BOOL supported = catalyst::FALSE;
         if (catdv_device_has_input(d, &supported).status != catalyst::STATUS_CODE_SUCCESS || !supported) continue;
         Fixture f = {d, 0, 0, 0};
         print_device(j, d);
-        perf_record(benchmark_io("open / close", lifecycle, &f, 0x01, 64), &failed, &unavailable);
         r = catin_device_open(d, &f.resource);
-        if (r.status != catalyst::STATUS_CODE_SUCCESS || !f.resource) { ++unavailable; continue; }
+        if (r.status != catalyst::STATUS_CODE_SUCCESS || !f.resource) {
+            std::printf("  Open unavailable or failed: %02X %02X %02X %02X\n",
+                (unsigned) r.status, (unsigned) r.context, (unsigned) r.operation, (unsigned) r.detail);
+            if (r.status == catalyst::STATUS_CODE_ERROR_NOT_FOUND || r.status == catalyst::STATUS_CODE_ERROR_ACCESS_DENIED ||
+                r.status == catalyst::STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED || r.status == catalyst::STATUS_CODE_ERROR_NOT_IMPLEMENTED)
+                ++unavailable;
+            else ++failed;
+            continue;
+        }
         ++opened;
-        if (CATALYST_NUINT_MAX >= 4096) {
+        if (!lifecycleDone) {
+            // Close this probe before measuring lifecycle; some devices allow only one open.
+            r = catin_device_close(f.resource);
+            if (r.status != catalyst::STATUS_CODE_SUCCESS) { ++failed; break; }
+            f.resource = 0;
+            perf_record(benchmark_io("open / close", lifecycle, &f, 0x01, 64, false), &failed, &unavailable);
+            lifecycleDone = true;
+            r = catin_device_open(d, &f.resource);
+            if (r.status != catalyst::STATUS_CODE_SUCCESS || !f.resource) { ++failed; continue; }
+        }
+        if (!rawDone && CATALYST_NUINT_MAX >= 4096) {
             f.field = 0x03;
-            perf_record(benchmark_io("native read polling", query, &f, f.field, 16777216UL, false), &failed, &unavailable);
-        } else ++unavailable;
-        f.field = 0x04;
-        perf_record(benchmark_io("channel count", query, &f, f.field, 16777216UL), &failed, &unavailable);
+            int measured = benchmark_io("native read polling", query, &f, f.field, 16777216UL, false);
+            perf_record(measured, &failed, &unavailable);
+            rawDone = measured != 2;
+        }
+        if (!countDone) {
+            f.field = 0x04;
+            int measured = benchmark_io("channel count", query, &f, f.field, 16777216UL);
+            perf_record(measured, &failed, &unavailable);
+            countDone = measured != 2;
+        }
         catalyst::NUINT count = 0;
         if (catin_device_get_channel_count(f.resource, &count).status == catalyst::STATUS_CODE_SUCCESS) {
-            bool digital = false, absolute = false, relative = false;
-            if (count) {
+            if (count && !metadataDone) {
+                metadataDone = true;
                 f.channel = 0; f.field = 0x05;
                 perf_record(benchmark_io("channel type", query, &f, f.field, 16777216UL), &failed, &unavailable);
                 f.field = 0x06;
@@ -71,6 +100,16 @@ int main() {
                 if (catin_channel_get_type(f.resource, k, &type).status != catalyst::STATUS_CODE_SUCCESS) continue;
                 f.channel = k;
                 if (type == CATINLIB_CHANNEL_DIGITAL && !digital) {
+                    catalyst::BOOL probe = catalyst::FALSE;
+                    catalyst::RESULT stateResult = catin_digital_get_state(f.resource, k, &probe);
+                    if (stateResult.status != catalyst::STATUS_CODE_SUCCESS) {
+                        // A channel may exist but not support a state query.
+                        if (stateResult.status != catalyst::STATUS_CODE_ERROR_NOT_FOUND &&
+                            stateResult.status != catalyst::STATUS_CODE_ERROR_ACCESS_DENIED &&
+                            stateResult.status != catalyst::STATUS_CODE_ERROR_NOT_IMPLEMENTED &&
+                            stateResult.status != catalyst::STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED) ++failed;
+                        continue;
+                    }
                     digital = true; f.field = 0x07;
                     double cNs = 0;
                     perf_record(benchmark_io("digital state", query, &f, f.field, 16777216UL, false, &cNs), &failed, &unavailable);
@@ -86,6 +125,19 @@ int main() {
                 }
 #if CATALYST_SUPPORTS_32BIT
                 if (type == CATINLIB_CHANNEL_ABSOLUTE && !absolute) {
+                    catalyst::INT probeLow = 0, probeHigh = 0, probeValue = 0;
+                    catalyst::RESULT rangeResult = catin_absolute_get_range(f.resource, k, &probeLow, &probeHigh);
+                    catalyst::RESULT valueResult = catin_absolute_get_value(f.resource, k, &probeValue);
+                    if (rangeResult.status != catalyst::STATUS_CODE_SUCCESS || valueResult.status != catalyst::STATUS_CODE_SUCCESS) {
+                        catalyst::STATUS_CODE statuses[] = {rangeResult.status, valueResult.status};
+                        for (catalyst::BYTE n = 0; n < 2; ++n)
+                            if (statuses[n] != catalyst::STATUS_CODE_SUCCESS &&
+                                statuses[n] != catalyst::STATUS_CODE_ERROR_NOT_FOUND &&
+                                statuses[n] != catalyst::STATUS_CODE_ERROR_ACCESS_DENIED &&
+                                statuses[n] != catalyst::STATUS_CODE_ERROR_NOT_IMPLEMENTED &&
+                                statuses[n] != catalyst::STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED) ++failed;
+                        continue;
+                    }
                     absolute = true; f.field = 0x09;
                     double cRange = 0, cValue = 0;
                     perf_record(benchmark_io("absolute range", query, &f, f.field, 16777216UL, true, &cRange), &failed, &unavailable);
@@ -108,10 +160,23 @@ int main() {
         }
         r = catin_device_close(f.resource);
         if (r.status != catalyst::STATUS_CODE_SUCCESS) ++failed;
-        /* Benchmark one accessible device by default; avoid large or changing workloads. */
-        break;
+        // Each operation is measured on its first suitable representative.
+        if (lifecycleDone && countDone && metadataDone && digital && rawDone
+#if CATALYST_SUPPORTS_32BIT
+            && absolute && relative
+#endif
+            ) break;
     }
     if (!opened) { std::printf("No accessible input device.\n"); ++unavailable; }
+    else {
+        if (!metadataDone) { std::printf("Channel metadata: unavailable\n"); ++unavailable; }
+        if (!digital) { std::printf("Digital input state: unavailable\n"); ++unavailable; }
+        if (!rawDone) { std::printf("Native read polling: unavailable\n"); ++unavailable; }
+#if CATALYST_SUPPORTS_32BIT
+        if (!absolute) { std::printf("Absolute input range/value: unavailable\n"); ++unavailable; }
+        if (!relative) { std::printf("Relative input occurrence polling: unavailable\n"); ++unavailable; }
+#endif
+    }
     if (catdv_devices_free(snapshot).status != catalyst::STATUS_CODE_SUCCESS) ++failed;
     std::printf("\nFailures: %d; unavailable benchmarks: %d\n", failed, unavailable);
     return failed ? 1 : unavailable ? 2 : 0;
