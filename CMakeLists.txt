@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 4.3.0)
 project(aether C CXX)
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-include_directories("${CMAKE_SOURCE_DIR}/include")
-include(${CMAKE_SOURCE_DIR}/cmake/CMakeInit.cmake REQUIRED)
+if(PROJECT_IS_TOP_LEVEL)
+    set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+endif()
+include("${PROJECT_SOURCE_DIR}/cmake/CMakeInit.cmake" REQUIRED)
 metadata("aether" 1 0 0 "alpha.1" "Cross-platform C ABI library for native system-level bindings and operating system functionality.")
 configure("${TARGET_VENDOR}" "${TARGET_SYSTEM}" "${TARGET_ARCHITECTURE}")
 define("cmake/CMakeConfig.h" "cmakecfg.h")
@@ -13,10 +14,31 @@ if(TARGET_PLATFORM_DARWIN)
     enable_language(OBJC OBJCXX)
 endif()
 
-# catsylib uses Core's foundational headers with Aether's generated target configuration.
-if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/core/include/catalyst.h")
-    message(FATAL_ERROR "Initialize the Core submodule: git submodule update --init --recursive")
+# Reuse a parent's Core targets; otherwise select one pinned source revision
+# or an explicitly requested installed package for the entire build.
+option(CATALYST_AETHER_USE_INSTALLED_CORE "Consume an installed CatalystCore package" OFF)
+set(CATALYST_CORE_REVISION "f11851fcfb6d4ddfaa802ee92ddc01bba69f810f" CACHE STRING "Core source revision")
+if(NOT TARGET Catalyst::catalyst)
+    if(CATALYST_AETHER_USE_INSTALLED_CORE)
+        find_package(CatalystCore 1.0.0 EXACT CONFIG REQUIRED GLOBAL)
+    else()
+        include(FetchContent)
+        FetchContent_Declare(
+            CatalystCore
+            GIT_REPOSITORY https://github.com/catalystui/lib-core-c.git
+            GIT_TAG "${CATALYST_CORE_REVISION}"
+            GIT_SUBMODULES cmake
+        )
+        FetchContent_MakeAvailable(CatalystCore)
+    endif()
 endif()
+foreach(CORE_TARGET Catalyst::catalyst Catalyst::catmm_static Catalyst::catmm_shared)
+    if(NOT TARGET ${CORE_TARGET})
+        message(FATAL_ERROR "Aether requires the Core target ${CORE_TARGET}.")
+    endif()
+endforeach()
+
+option(CATALYST_AETHER_BUILD_TESTS "Build Aether's standalone verification programs" ${PROJECT_IS_TOP_LEVEL})
 
 if(TARGET_PLATFORM_WIN32)
     set(CATSYLIB_PLATFORM_SOURCE src/catsylib.win32.cpp)
@@ -39,10 +61,10 @@ configure_target(
 )
 foreach(TARGET_NAME catsylib_shared catsylib_static)
     target_include_directories(${TARGET_NAME} PUBLIC
-        "${CMAKE_CURRENT_SOURCE_DIR}/include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/core/include"
-        "${CMAKE_CURRENT_BINARY_DIR}/generated"
+        "${PROJECT_SOURCE_DIR}/include"
     )
+    target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+    target_link_libraries(${TARGET_NAME} PUBLIC Catalyst::catalyst)
     if(TARGET_PLATFORM_WIN32)
         target_link_libraries(${TARGET_NAME} PRIVATE advapi32)
     else()
@@ -50,23 +72,30 @@ foreach(TARGET_NAME catsylib_shared catsylib_static)
     endif()
 endforeach()
 target_compile_definitions(catsylib_shared PRIVATE CATSYLIB_EXPORTS INTERFACE CATSYLIB_USE_DLL)
+target_link_libraries(catsylib_static PRIVATE Catalyst::catmm_static)
+target_link_libraries(catsylib_shared PRIVATE Catalyst::catmm_shared)
 
-# Native device and I/O modules. Linux uses the pinned Core memory/text
-# implementations as private object dependencies (no additional runtime library).
+add_library(Catalyst::catsy_static ALIAS catsylib_static)
+add_library(Catalyst::catsy_shared ALIAS catsylib_shared)
+
+# An installed Core may be outside Aether's runtime directory. Permit CMake
+# to resolve its shared library location during the build, retaining the
+# existing relative install RPATH for distribution.
+get_target_property(CORE_IMPORTED Catalyst::catmm_shared IMPORTED)
+if(CORE_IMPORTED AND (TARGET_PLATFORM_LINUX OR TARGET_PLATFORM_DARWIN))
+    set_target_properties(catsylib_shared PROPERTIES
+        BUILD_WITH_INSTALL_RPATH FALSE
+        BUILD_RPATH_USE_ORIGIN TRUE
+    )
+endif()
+
+# Native device and I/O modules consume the same Core targets as CATSYLIB.
 if(TARGET_PLATFORM_LINUX)
-    add_library(aether_device_core OBJECT
-        core/src/catmmlib.cpp
-        core/src/catmmlib.linux.cpp
-        core/src/cattelib.cpp
-    )
-    target_include_directories(aether_device_core PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/core/include"
-        "${CMAKE_CURRENT_BINARY_DIR}/generated"
-    )
-    set_target_properties(aether_device_core PROPERTIES
-        POSITION_INDEPENDENT_CODE ON
-        CXX_VISIBILITY_PRESET hidden
-    )
+    foreach(CORE_TARGET Catalyst::catte_static Catalyst::catte_shared)
+        if(NOT TARGET ${CORE_TARGET})
+            message(FATAL_ERROR "Aether requires the Core target ${CORE_TARGET}.")
+        endif()
+    endforeach()
 endif()
 
 foreach(MODULE catdv catin catot)
@@ -86,24 +115,35 @@ foreach(MODULE catdv catin catot)
     string(TOUPPER "${MODULE_NAME}" MODULE_UPPER)
     target_compile_definitions(${MODULE_NAME}_shared PRIVATE ${MODULE_UPPER}_EXPORTS INTERFACE ${MODULE_UPPER}_USE_DLL)
     foreach(KIND shared static)
-        target_include_directories(${MODULE_NAME}_${KIND} PUBLIC
-            "${CMAKE_CURRENT_SOURCE_DIR}/include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/core/include"
-            "${CMAKE_CURRENT_BINARY_DIR}/generated"
-        )
+        set(TARGET_NAME "${MODULE_NAME}_${KIND}")
+        target_include_directories(${TARGET_NAME} PUBLIC "${PROJECT_SOURCE_DIR}/include")
+        target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+        target_link_libraries(${TARGET_NAME} PUBLIC Catalyst::catalyst)
         if(TARGET_PLATFORM_LINUX)
-            target_sources(${MODULE_NAME}_${KIND} PRIVATE $<TARGET_OBJECTS:aether_device_core>)
+            target_link_libraries(${TARGET_NAME} PRIVATE Catalyst::catmm_${KIND})
+            if(MODULE STREQUAL "catdv")
+                target_link_libraries(${TARGET_NAME} PRIVATE Catalyst::catte_${KIND})
+            endif()
         endif()
         if(NOT MODULE STREQUAL "catdv")
-            target_link_libraries(${MODULE_NAME}_${KIND} PUBLIC catdvlib_${KIND})
+            target_link_libraries(${TARGET_NAME} PUBLIC Catalyst::catdv_${KIND})
         endif()
+        add_library(Catalyst::${MODULE}_${KIND} ALIAS ${TARGET_NAME})
     endforeach()
+    if(CORE_IMPORTED AND (TARGET_PLATFORM_LINUX OR TARGET_PLATFORM_DARWIN))
+        set_target_properties(${MODULE_NAME}_shared PROPERTIES
+            BUILD_WITH_INSTALL_RPATH FALSE
+            BUILD_RPATH_USE_ORIGIN TRUE
+        )
+    endif()
 endforeach()
 
 # Define standalone verification and performance executables.
-define_test_executables(
-    STATIC_DEPENDS
-        catsylib_static
-    SHARED_DEPENDS
-        catsylib_shared
-)
+if(CATALYST_AETHER_BUILD_TESTS)
+    define_test_executables(
+        STATIC_DEPENDS
+            catsylib_static
+        SHARED_DEPENDS
+            catsylib_shared
+    )
+endif()

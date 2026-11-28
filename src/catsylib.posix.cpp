@@ -7,6 +7,7 @@
 #include "cmakecfg.h"
 #if TARGET_PLATFORM_LINUX || TARGET_PLATFORM_DARWIN
 #include "catsylib.internal.hpp"
+#include "catmmlib.h"
 #include <sys/utsname.h>
 #include <errno.h>
 #include <iconv.h>
@@ -74,7 +75,7 @@ static CATALYST_RESULT catsy_copy(CATSYLIB_FIELD field, const char* value,
     *required = (NUINT) (length + 1);
     if (output == 0) return RESULT(STATUS_CODE_SUCCESS, context, 0x01, 0);
     if (capacity < *required) return RESULT(STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x03, 0);
-    memcpy(output, value, *required);
+    catmm_copy(output, value, *required);
     return RESULT(STATUS_CODE_SUCCESS, context, 0x02, 0);
 }
 

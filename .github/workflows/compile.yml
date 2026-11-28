@@ -58,10 +58,16 @@ jobs:
             -DCMAKE_C_STANDARD_REQUIRED=ON -DCMAKE_CXX_STANDARD_REQUIRED=ON `
             -DCMAKE_C_EXTENSIONS=OFF -DCMAKE_CXX_EXTENSIONS=OFF `
             -DCMAKE_C_FLAGS=${{ matrix.flags }} -DCMAKE_CXX_FLAGS=${{ matrix.flags }} `
-            -DTARGET_VENDOR=linux -DTARGET_SYSTEM=linux -DTARGET_ARCHITECTURE=${{ matrix.arch }}
+            -DTARGET_VENDOR=linux -DTARGET_SYSTEM=linux -DTARGET_ARCHITECTURE=${{ matrix.arch }} `
+            -DCATALYST_CORE_INSTALL=ON
 
       - name: Compile libraries
         run: cmake --build target/ci --parallel
+
+      - name: Run system identification verification
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          & "./build/linux/linux/${{ matrix.arch }}/release/test_catsylib"
 
       - name: Compile public C headers
         run: |
@@ -72,7 +78,7 @@ jobs:
           }
           foreach ($header in $headers) {
             $relative = [IO.Path]::GetRelativePath((Resolve-Path include).Path, $header.FullName)
-            "#include `"$relative`"" | gcc ${{ matrix.flags }} -std=c${{ matrix.c }} -pedantic-errors -Iinclude -Icore/include -Itarget/ci/generated -x c -fsyntax-only -
+            "#include `"$relative`"" | gcc ${{ matrix.flags }} -std=c${{ matrix.c }} -pedantic-errors -Iinclude -Itarget/ci/_deps/catalystcore-src/include -Itarget/ci/generated -x c -fsyntax-only -
           }
 
       - name: Compile public C++ headers
@@ -84,5 +90,32 @@ jobs:
           }
           foreach ($header in $headers) {
             $relative = [IO.Path]::GetRelativePath((Resolve-Path include).Path, $header.FullName)
-            "#include `"$relative`"" | g++ ${{ matrix.flags }} -std=c++${{ matrix.cpp }} -pedantic-errors -Iinclude -Icore/include -Itarget/ci/generated -x c++ -fsyntax-only -
+            "#include `"$relative`"" | g++ ${{ matrix.flags }} -std=c++${{ matrix.cpp }} -pedantic-errors -Iinclude -Itarget/ci/_deps/catalystcore-src/include -Itarget/ci/generated -x c++ -fsyntax-only -
           }
+
+      - name: Verify installed Core consumption
+        if: matrix.arch == 'x64'
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $prefix = Join-Path (Resolve-Path target/ci).Path 'core-package'
+          cmake --install target/ci --prefix "$prefix"
+
+          # Isolate source-built artifacts from the package-consumption build.
+          $output = 'build/linux/linux/${{ matrix.arch }}/release'
+          Move-Item $output target/ci/source-output
+          cmake -S . -B target/ci-package -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ `
+            -DCMAKE_C_STANDARD=${{ matrix.c }} -DCMAKE_CXX_STANDARD=${{ matrix.cpp }} `
+            -DCMAKE_C_STANDARD_REQUIRED=ON -DCMAKE_CXX_STANDARD_REQUIRED=ON `
+            -DCMAKE_C_EXTENSIONS=OFF -DCMAKE_CXX_EXTENSIONS=OFF `
+            -DCMAKE_C_FLAGS=${{ matrix.flags }} -DCMAKE_CXX_FLAGS=${{ matrix.flags }} `
+            -DTARGET_VENDOR=linux -DTARGET_SYSTEM=linux -DTARGET_ARCHITECTURE=${{ matrix.arch }} `
+            -DCATALYST_AETHER_USE_INSTALLED_CORE=ON "-DCMAKE_PREFIX_PATH=$prefix"
+          cmake --build target/ci-package --parallel
+          & "./$output/test_catsylib"
+
+          # Link and run the existing verification program against shared Aether.
+          # Its Core dependency must resolve from the installed package.
+          g++ ${{ matrix.flags }} -std=c++${{ matrix.cpp }} -Iinclude -Itarget/ci-package/generated "-I$prefix/include" `
+            test/test_catsylib.cpp "-L$output/lib" -lcatsy '-Wl,-rpath,$ORIGIN' -o "$output/test_catsylib_shared"
+          & "./$output/test_catsylib_shared"
