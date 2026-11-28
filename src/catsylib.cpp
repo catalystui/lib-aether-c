@@ -1,5 +1,9 @@
 #include "catsylib.internal.hpp"
 
+/* -------------------------------------------------------------------------------------------------
+ * C API :: SYSTEM IDENTIFICATION
+ * ------------------------------------------------------------------------------------------------- */
+
 static CATALYST_RESULT catsy_system_get(CATSYLIB_FIELD field, CATALYST_UTF8W output,
     CATALYST_NUINT capacity, CATALYST_NUINT* required) {
     *required = 0;

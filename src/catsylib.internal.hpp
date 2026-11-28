@@ -12,7 +12,7 @@ enum CATSYLIB_FIELD {
     CATSYLIB_FIELD_HOSTNAME = 0x06
 };
 
-/* The caller has validated the public output arguments. */
+/* Public output preconditions hold; required initially contains zero. */
 CATALYST_RESULT catsy_platform_get(CATSYLIB_FIELD field, CATALYST_UTF8W output,
     CATALYST_NUINT capacity, CATALYST_NUINT* required);
 

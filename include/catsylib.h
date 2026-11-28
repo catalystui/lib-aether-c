@@ -18,11 +18,14 @@ extern "C" {
     #define CATSYLIB_API
 #endif
 
-/* System Identification */
+/* -------------------------------------------------------------------------------------------------
+ * C API :: SYSTEM IDENTIFICATION
+ * ------------------------------------------------------------------------------------------------- */
 
 /* All queries use caller-owned UTF-8 storage; capacity and required include
  * the terminating zero. Pass output = 0 and capacity = 0 to query the size.
- * required must be writable and must not overlap output. Insufficient
+ * Otherwise output must be writable for capacity units; required must be
+ * writable and must not overlap output. Insufficient
  * capacity leaves output unchanged. Other failures set required to zero. */
 
 /** Retrieve the operating system name. */

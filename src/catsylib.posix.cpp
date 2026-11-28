@@ -5,6 +5,7 @@
 #define _DARWIN_C_SOURCE 1
 #endif
 #include "cmakecfg.h"
+#if TARGET_PLATFORM_LINUX || TARGET_PLATFORM_DARWIN
 #include "catsylib.internal.hpp"
 #include <sys/utsname.h>
 #include <errno.h>
@@ -17,6 +18,10 @@
 #endif
 
 using namespace catalyst;
+
+/* -------------------------------------------------------------------------------------------------
+ * Native text retrieval
+ * ------------------------------------------------------------------------------------------------- */
 
 static STATUS_CODE catsy_errno_status(int error) {
     switch (error) {
@@ -74,6 +79,10 @@ static CATALYST_RESULT catsy_copy(CATSYLIB_FIELD field, const char* value,
 }
 
 #if TARGET_PLATFORM_LINUX
+/* -------------------------------------------------------------------------------------------------
+ * Linux distribution identification
+ * ------------------------------------------------------------------------------------------------- */
+
 /* Decode one os-release assignment in place. Never execute the file or expand
  * variables. Quoted and escaped shell characters are treated as data. */
 static BOOL catsy_os_release_value(char* value) {
@@ -162,13 +171,14 @@ static CATALYST_RESULT catsy_distribution(CATSYLIB_FIELD field, UTF8W output,
     }
     free(line);
     int closeError = fclose(file);
+    int closeStatus = errno;
     if (status != STATUS_CODE_SUCCESS) {
         free(found);
         return RESULT(status, context, 0x11, 0);
     }
     if (closeError != 0) {
         free(found);
-        return RESULT(catsy_errno_status(errno), context, 0x12, 0);
+        return RESULT(catsy_errno_status(closeStatus), context, 0x12, 0);
     }
     if (found == 0) return RESULT(STATUS_CODE_ERROR_NOT_FOUND, context, 0x13, 0);
     CATALYST_RESULT result = catsy_copy(field, found, output, capacity, required);
@@ -178,6 +188,10 @@ static CATALYST_RESULT catsy_distribution(CATSYLIB_FIELD field, UTF8W output,
 #endif
 
 #if TARGET_PLATFORM_DARWIN
+/* -------------------------------------------------------------------------------------------------
+ * Darwin distribution identification
+ * ------------------------------------------------------------------------------------------------- */
+
 static CATALYST_RESULT catsy_distribution_version(CATSYLIB_FIELD field, UTF8W output,
     NUINT capacity, NUINT* required) {
     CONTEXT_CODE context = (CONTEXT_CODE) field;
@@ -187,6 +201,7 @@ static CATALYST_RESULT catsy_distribution_version(CATSYLIB_FIELD field, UTF8W ou
             : catsy_errno_status(errno), context, 0x14, 0);
     }
     if (length == 0) return RESULT(STATUS_CODE_ERROR_NOT_FOUND, context, 0x15, 0);
+    size_t allocated = length;
     char* value = (char*) malloc(length);
     if (value == 0) return RESULT(STATUS_CODE_ERROR_ALLOCATION_FAILED, context, 0x16, 0);
     if (sysctlbyname("kern.osproductversion", value, &length, 0, 0) != 0) {
@@ -194,7 +209,7 @@ static CATALYST_RESULT catsy_distribution_version(CATSYLIB_FIELD field, UTF8W ou
         free(value);
         return RESULT(catsy_errno_status(error), context, 0x17, 0);
     }
-    if (length == 0 || value[length - 1] != 0 || strlen(value) != length - 1) {
+    if (length == 0 || length > allocated || value[length - 1] != 0 || strlen(value) != length - 1) {
         free(value);
         return RESULT(STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x18, 0);
     }
@@ -203,6 +218,10 @@ static CATALYST_RESULT catsy_distribution_version(CATSYLIB_FIELD field, UTF8W ou
     return result;
 }
 #endif
+
+/* -------------------------------------------------------------------------------------------------
+ * System identification
+ * ------------------------------------------------------------------------------------------------- */
 
 CATALYST_RESULT catsy_platform_get(CATSYLIB_FIELD field, UTF8W output,
     NUINT capacity, NUINT* required) {
@@ -219,9 +238,13 @@ CATALYST_RESULT catsy_platform_get(CATSYLIB_FIELD field, UTF8W output,
     if (field == CATSYLIB_FIELD_ARCHITECTURE) {
         int translated = 0;
         size_t size = sizeof(translated);
-        if (sysctlbyname("sysctl.proc_translated", &translated, &size, 0, 0) == 0 &&
-            size == sizeof(translated) && translated == 1) {
-            return catsy_copy(field, "arm64", output, capacity, required);
+        if (sysctlbyname("sysctl.proc_translated", &translated, &size, 0, 0) == 0) {
+            if (size != sizeof(translated) || (translated != 0 && translated != 1)) {
+                return RESULT(STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x1B, 0);
+            }
+            if (translated == 1) return catsy_copy(field, "arm64", output, capacity, required);
+        } else if (errno != ENOENT) {
+            return RESULT(catsy_errno_status(errno), context, 0x1C, 0);
         }
     }
 #endif
@@ -243,6 +266,8 @@ CATALYST_RESULT catsy_platform_get(CATSYLIB_FIELD field, UTF8W output,
                 return catsy_copy(field, "x86", output, capacity, required);
             }
             return catsy_copy(field, system.machine, output, capacity, required);
-        default: return RESULT(STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED, context, 0x1A, 0);
+        default: return RESULT(STATUS_CODE_FATAL_INVARIANT_VIOLATION, context, 0x1A, 0);
     }
 }
+
+#endif /* TARGET_PLATFORM_LINUX || TARGET_PLATFORM_DARWIN */

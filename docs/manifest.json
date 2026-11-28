@@ -3,7 +3,14 @@
         {
             "title": "Overview",
             "path": "/",
-            "alignment": "block"
+            "alignment": "block",
+            "children": [
+                {
+                    "title": "Assumptions",
+                    "path": "/assumptions",
+                    "alignment": "block"
+                }
+            ]
         },
         {
             "title": "API Reference",

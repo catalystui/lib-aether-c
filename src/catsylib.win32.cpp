@@ -1,4 +1,5 @@
 #include "cmakecfg.h"
+#if TARGET_PLATFORM_WIN32
 #include "catsylib.internal.hpp"
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -11,6 +12,10 @@ using catalyst::CONTEXT_CODE;
 using catalyst::STATUS_CODE;
 using catalyst::UTF8W;
 using catalyst::NUINT;
+
+/* -------------------------------------------------------------------------------------------------
+ * Native text retrieval
+ * ------------------------------------------------------------------------------------------------- */
 
 static STATUS_CODE catsy_win32_status(DWORD error) {
     switch (error) {
@@ -31,22 +36,26 @@ static STATUS_CODE catsy_win32_status(DWORD error) {
 static CATALYST_RESULT catsy_copy(CATSYLIB_FIELD field, const WCHAR* value,
     UTF8W output, NUINT capacity, NUINT* required) {
     CONTEXT_CODE context = (CONTEXT_CODE) field;
-    if (*value == 0) return RESULT(CATALYST_STATUS_CODE_ERROR_NOT_FOUND, context, 0x06, 0);
+    if (*value == 0) return RESULT(CATALYST_STATUS_CODE_ERROR_NOT_FOUND, context, 0x46, 0);
     int length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, -1, 0, 0, 0, 0);
-    if (length <= 0) return RESULT(catsy_win32_status(GetLastError()), context, 0x08, 0);
+    if (length <= 0) return RESULT(catsy_win32_status(GetLastError()), context, 0x48, 0);
     if ((SIZE_T) length > CATALYST_NUINT_MAX) {
-        return RESULT(CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x07, 0);
+        return RESULT(CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x47, 0);
     }
     *required = (NUINT) length;
-    if (output == 0) return RESULT(CATALYST_STATUS_CODE_SUCCESS, context, 0x01, 0);
-    if (capacity < *required) return RESULT(CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x03, 0);
+    if (output == 0) return RESULT(CATALYST_STATUS_CODE_SUCCESS, context, 0x41, 0);
+    if (capacity < *required) return RESULT(CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x43, 0);
     if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, -1,
         (char*) output, length, 0, 0) != length) {
         *required = 0;
-        return RESULT(catsy_win32_status(GetLastError()), context, 0x0A, 0);
+        return RESULT(catsy_win32_status(GetLastError()), context, 0x4A, 0);
     }
-    return RESULT(CATALYST_STATUS_CODE_SUCCESS, context, 0x02, 0);
+    return RESULT(CATALYST_STATUS_CODE_SUCCESS, context, 0x42, 0);
 }
+
+/* -------------------------------------------------------------------------------------------------
+ * Native system identification
+ * ------------------------------------------------------------------------------------------------- */
 
 /* RtlGetVersion reports the running NT version independently of application manifests. */
 static STATUS_CODE catsy_version(OSVERSIONINFOEXW* version) {
@@ -77,7 +86,7 @@ static CATALYST_RESULT catsy_kernel_version(CATSYLIB_FIELD field, UTF8W output,
     OSVERSIONINFOEXW version;
     STATUS_CODE status = catsy_version(&version);
     if (status != CATALYST_STATUS_CODE_SUCCESS) {
-        return RESULT(status, (CONTEXT_CODE) field, 0x10, 0);
+        return RESULT(status, (CONTEXT_CODE) field, 0x50, 0);
     }
     WCHAR value[33]; /* Three DWORDs, two separators, terminator. */
     WCHAR* end = catsy_decimal(value, version.dwMajorVersion);
@@ -96,7 +105,7 @@ static CATALYST_RESULT catsy_registry(CATSYLIB_FIELD field, UTF8W output,
     LONG error = RegOpenKeyExW(HKEY_LOCAL_MACHINE,
         L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 0,
         KEY_QUERY_VALUE | KEY_WOW64_64KEY, &key);
-    if (error != ERROR_SUCCESS) return RESULT(catsy_win32_status((DWORD) error), context, 0x11, 0);
+    if (error != ERROR_SUCCESS) return RESULT(catsy_win32_status((DWORD) error), context, 0x51, 0);
 
     const WCHAR* name = field == CATSYLIB_FIELD_DISTRIBUTION ? L"ProductName" : L"DisplayVersion";
     DWORD type = 0;
@@ -108,38 +117,38 @@ static CATALYST_RESULT catsy_registry(CATSYLIB_FIELD field, UTF8W output,
     }
     if (error != ERROR_SUCCESS) {
         RegCloseKey(key);
-        return RESULT(catsy_win32_status((DWORD) error), context, 0x12, 0);
+        return RESULT(catsy_win32_status((DWORD) error), context, 0x52, 0);
     }
     if (type != REG_SZ || bytes == 0 || bytes % sizeof(WCHAR) != 0) {
         RegCloseKey(key);
-        return RESULT(CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x13, 0);
+        return RESULT(CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x53, 0);
     }
     if ((SIZE_T) bytes > (SIZE_T) -1 - sizeof(WCHAR)) {
         RegCloseKey(key);
-        return RESULT(CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x14, 0);
+        return RESULT(CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x54, 0);
     }
     DWORD allocated = bytes;
     WCHAR* value = (WCHAR*) HeapAlloc(GetProcessHeap(), 0, (SIZE_T) bytes + sizeof(WCHAR));
     if (value == 0) {
         RegCloseKey(key);
-        return RESULT(CATALYST_STATUS_CODE_ERROR_ALLOCATION_FAILED, context, 0x15, 0);
+        return RESULT(CATALYST_STATUS_CODE_ERROR_ALLOCATION_FAILED, context, 0x55, 0);
     }
     error = RegQueryValueExW(key, name, 0, &type, (BYTE*) value, &bytes);
     LONG closeError = RegCloseKey(key);
     if (error != ERROR_SUCCESS || closeError != ERROR_SUCCESS) {
         HeapFree(GetProcessHeap(), 0, value);
-        return RESULT(catsy_win32_status((DWORD) (error != ERROR_SUCCESS ? error : closeError)), context, 0x16, 0);
+        return RESULT(catsy_win32_status((DWORD) (error != ERROR_SUCCESS ? error : closeError)), context, 0x56, 0);
     }
     if (type != REG_SZ || bytes > allocated || bytes % sizeof(WCHAR) != 0) {
         HeapFree(GetProcessHeap(), 0, value);
-        return RESULT(CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x17, 0);
+        return RESULT(CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x57, 0);
     }
     SIZE_T units = bytes / sizeof(WCHAR);
     value[units] = 0; /* Registry strings are not guaranteed terminated. */
     for (SIZE_T i = 0; i < units; ++i) {
         if (value[i] == 0 && i + 1 != units) {
             HeapFree(GetProcessHeap(), 0, value);
-            return RESULT(CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x1F, 0);
+            return RESULT(CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x5F, 0);
         }
     }
     if (field == CATSYLIB_FIELD_DISTRIBUTION) {
@@ -153,9 +162,9 @@ static CATALYST_RESULT catsy_registry(CATSYLIB_FIELD field, UTF8W output,
         }
     }
     CATALYST_RESULT result = catsy_copy(field, value, output, capacity, required);
-    if (!HeapFree(GetProcessHeap(), 0, value) && CATALYST_STATUS_CODE_IS_SUCCESS(result.status)) {
+    if (!HeapFree(GetProcessHeap(), 0, value) && (CATALYST_STATUS_CODE_IS_SUCCESS(result.status) || (result.status == CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW && result.operation == 0x43))) {
         *required = 0;
-        return RESULT(CATALYST_STATUS_CODE_ERROR_INVALID_STATE, context, 0x20, 0);
+        return RESULT(CATALYST_STATUS_CODE_ERROR_INVALID_STATE, context, 0x60, 0);
     }
     return result;
 }
@@ -166,23 +175,23 @@ static CATALYST_RESULT catsy_hostname(CATSYLIB_FIELD field, UTF8W output,
     DWORD length = 0;
     if (!GetComputerNameExW(ComputerNameDnsHostname, 0, &length)) {
         DWORD error = GetLastError();
-        if (error != ERROR_MORE_DATA) return RESULT(catsy_win32_status(error), context, 0x18, 0);
+        if (error != ERROR_MORE_DATA) return RESULT(catsy_win32_status(error), context, 0x58, 0);
     }
-    if (length == 0) return RESULT(CATALYST_STATUS_CODE_ERROR_NOT_FOUND, context, 0x19, 0);
+    if (length == 0) return RESULT(CATALYST_STATUS_CODE_ERROR_NOT_FOUND, context, 0x59, 0);
     if ((SIZE_T) length > (SIZE_T) -1 / sizeof(WCHAR)) {
-        return RESULT(CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x1A, 0);
+        return RESULT(CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x5A, 0);
     }
     WCHAR* value = (WCHAR*) HeapAlloc(GetProcessHeap(), 0, (SIZE_T) length * sizeof(WCHAR));
-    if (value == 0) return RESULT(CATALYST_STATUS_CODE_ERROR_ALLOCATION_FAILED, context, 0x1B, 0);
+    if (value == 0) return RESULT(CATALYST_STATUS_CODE_ERROR_ALLOCATION_FAILED, context, 0x5B, 0);
     if (!GetComputerNameExW(ComputerNameDnsHostname, value, &length)) {
         DWORD error = GetLastError();
         HeapFree(GetProcessHeap(), 0, value);
-        return RESULT(catsy_win32_status(error), context, 0x1C, 0);
+        return RESULT(catsy_win32_status(error), context, 0x5C, 0);
     }
     CATALYST_RESULT result = catsy_copy(field, value, output, capacity, required);
-    if (!HeapFree(GetProcessHeap(), 0, value) && CATALYST_STATUS_CODE_IS_SUCCESS(result.status)) {
+    if (!HeapFree(GetProcessHeap(), 0, value) && (CATALYST_STATUS_CODE_IS_SUCCESS(result.status) || (result.status == CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW && result.operation == 0x43))) {
         *required = 0;
-        return RESULT(CATALYST_STATUS_CODE_ERROR_INVALID_STATE, context, 0x21, 0);
+        return RESULT(CATALYST_STATUS_CODE_ERROR_INVALID_STATE, context, 0x61, 0);
     }
     return result;
 }
@@ -223,6 +232,10 @@ static const WCHAR* catsy_architecture(STATUS_CODE* status) {
     }
 }
 
+/* -------------------------------------------------------------------------------------------------
+ * System identification
+ * ------------------------------------------------------------------------------------------------- */
+
 CATALYST_RESULT catsy_platform_get(CATSYLIB_FIELD field, UTF8W output,
     NUINT capacity, NUINT* required) {
     switch (field) {
@@ -235,8 +248,10 @@ CATALYST_RESULT catsy_platform_get(CATSYLIB_FIELD field, UTF8W output,
             STATUS_CODE status;
             const WCHAR* architecture = catsy_architecture(&status);
             if (architecture != 0) return catsy_copy(field, architecture, output, capacity, required);
-            return RESULT(status, (CONTEXT_CODE) field, 0x1D, 0);
+            return RESULT(status, (CONTEXT_CODE) field, 0x5D, 0);
         }
-        default: return RESULT(CATALYST_STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED, (CONTEXT_CODE) field, 0x1E, 0);
+        default: return RESULT(CATALYST_STATUS_CODE_FATAL_INVARIANT_VIOLATION, (CONTEXT_CODE) field, 0x5E, 0);
     }
 }
+
+#endif /* TARGET_PLATFORM_WIN32 */

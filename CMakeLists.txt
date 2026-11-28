@@ -50,3 +50,11 @@ foreach(TARGET_NAME catsylib_shared catsylib_static)
     endif()
 endforeach()
 target_compile_definitions(catsylib_shared PRIVATE CATSYLIB_EXPORTS INTERFACE CATSYLIB_USE_DLL)
+
+# Define standalone verification and performance executables.
+define_test_executables(
+    STATIC_DEPENDS
+        catsylib_static
+    SHARED_DEPENDS
+        catsylib_shared
+)

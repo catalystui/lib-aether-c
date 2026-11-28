@@ -1,3 +1,5 @@
 # API Reference
 
-- [CATSYLIB](catsylib/index.md) — System identification.
+| Library | Description |
+| --- | --- |
+| [CATSYLIB](catsylib/index.md) | Native system identification. |
