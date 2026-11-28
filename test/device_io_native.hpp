@@ -1,7 +1,6 @@
 #ifndef DEVICE_IO_NATIVE_HPP
 #define DEVICE_IO_NATIVE_HPP
-#include "device_io_test.hpp"
-
+/* Native SDK declarations must precede the test helper's Catalyst namespace imports. */
 #if TARGET_PLATFORM_DARWIN
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
@@ -16,6 +15,8 @@
 #include <unistd.h>
 #include <limits.h>
 #endif
+
+#include "device_io_test.hpp"
 
 /* Independent test-only native reference. Match the exact instance and channel
  * before timing; never call Aether's private backend or synthesize hardware. */
