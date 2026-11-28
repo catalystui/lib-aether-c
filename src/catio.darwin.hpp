@@ -88,10 +88,17 @@ static inline catalyst::BOOL catio_mac_direction(IOHIDElementRef e, catalyst::BO
 }
 static inline catalyst::BYTE catio_mac_type(IOHIDElementRef e, catalyst::BOOL input) {
     if (!catio_mac_direction(e, input)) return 0;
-    if (IOHIDElementIsArray(e) || IOHIDElementGetReportCount(e) != 1 ||
-        IOHIDElementGetReportSize(e) == 0 || IOHIDElementGetReportSize(e) > 32) return 0;
+    uint32_t bits = IOHIDElementGetReportSize(e);
+    if (IOHIDElementGetReportCount(e) != 1 || bits == 0 || bits > 32) return 0;
     CFIndex low = IOHIDElementGetLogicalMin(e), high = IOHIDElementGetLogicalMax(e);
     if (low < CATALYST_INT_MIN || high > CATALYST_INT_MAX || low > high) return 0;
+    /* IOKit expands array usages into individual one-bit button values.
+     * The raw array selector has usage 0xffffffff. Do not interpret it
+     * as a scalar, or reject the expanded button merely for its array flag. */
+    if (IOHIDElementIsArray(e)) {
+        if (IOHIDElementGetUsage(e) == 0xffffffffu || bits != 1 || low != 0 || high != 1)
+            return 0;
+    }
     if (IOHIDElementIsRelative(e)) return input ? 3 : 0;
     return low == 0 && high == 1 ? 1 : 2;
 }

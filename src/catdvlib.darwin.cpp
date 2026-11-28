@@ -63,6 +63,7 @@ static catalyst::STATUS_CODE catdv_mac_entry(CATDVLIB_DEVICES* devices, IOHIDDev
             IOHIDElementRef element = (IOHIDElementRef) CFArrayGetValueAtIndex(elements, j);
             if (catio_mac_direction(element, catalyst::TRUE)) d->input = catalyst::TRUE;
             if (catio_mac_direction(element, catalyst::FALSE)) d->output = catalyst::TRUE;
+            if (d->input && d->output) break;
         }
         CFRelease(elements);
     } else d->capability_status = catalyst::STATUS_CODE_ERROR_NOT_FOUND;
