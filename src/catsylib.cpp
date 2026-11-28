@@ -1,4 +1,8 @@
 #include "catsylib.internal.hpp"
+#include "catsylib.h"
+#include "catalyst.hpp"
+#include "catmmlib.h"
+#include "cattelib.h"
 
 using namespace catalyst;
 

@@ -22,8 +22,9 @@
 #undef FALSE
 #elif TARGET_PLATFORM_DARWIN || TARGET_PLATFORM_LINUX
 #include <sys/utsname.h>
+#if TARGET_PLATFORM_LINUX
 #include <errno.h>
-#if TARGET_PLATFORM_DARWIN
+#elif TARGET_PLATFORM_DARWIN
 #include <sys/sysctl.h>
 #endif
 #endif

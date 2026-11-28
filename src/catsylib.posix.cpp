@@ -7,6 +7,8 @@
 #include "cmakecfg.h"
 #if TARGET_PLATFORM_LINUX || TARGET_PLATFORM_DARWIN
 #include "catsylib.internal.hpp"
+#include "catalyst.hpp"
+#include "catmmlib.h"
 #include <sys/utsname.h>
 #include <errno.h>
 #if TARGET_PLATFORM_LINUX
@@ -180,7 +182,6 @@ static CATALYST_RESULT catsy_distribution(CATSYLIB_FIELD field, UTF8W output,
     }
     return catsy_release(storage, result, 0x22, required);
 }
-
 #endif
 
 #if TARGET_PLATFORM_DARWIN
@@ -230,7 +231,6 @@ static CATALYST_RESULT catsy_distribution_version(CATSYLIB_FIELD field, UTF8W ou
     }
     return catsy_release(storage, result, 0x27, required);
 }
-
 #endif
 
 /* -------------------------------------------------------------------------------------------------

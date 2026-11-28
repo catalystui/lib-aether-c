@@ -1,6 +1,9 @@
 #include "cmakecfg.h"
 #if TARGET_PLATFORM_WIN32
 #include "catsylib.internal.hpp"
+#include "catalyst.hpp"
+#include "catmmlib.h"
+#include "cattelib.h"
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif

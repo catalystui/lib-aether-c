@@ -1,9 +1,7 @@
 #ifndef CATSYLIB_INTERNAL_HPP
 #define CATSYLIB_INTERNAL_HPP
-#include "catsylib.h"
-#include "catalyst.hpp"
+#include "catalyst.h"
 #include "catmmlib.h"
-#include "cattelib.h"
 
 enum CATSYLIB_FIELD {
     CATSYLIB_FIELD_NAME = 0x01,
