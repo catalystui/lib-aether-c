@@ -75,16 +75,21 @@ struct CATIO_MAC_RESOURCE {
     CATIO_MAC_CHANNEL* channels;
     NUINT count;
 };
-static inline BYTE catio_mac_type(IOHIDElementRef e, BOOL input) {
+/* Direction and scalar representability are separate properties. Unknown
+ * channels are native elements whose values cannot be interpreted as scalars. */
+static inline BOOL catio_mac_direction(IOHIDElementRef e, BOOL input) {
     IOHIDElementType type = IOHIDElementGetType(e);
-    if (input) {
-        if (type != kIOHIDElementTypeInput_Misc && type != kIOHIDElementTypeInput_Button &&
-            type != kIOHIDElementTypeInput_Axis && type != kIOHIDElementTypeInput_ScanCodes) return 0;
-    } else if (type != kIOHIDElementTypeOutput) return 0;
-    if (IOHIDElementGetReportCount(e) != 1 || IOHIDElementGetReportSize(e) > 32) return 0;
+    if (!input) return type == kIOHIDElementTypeOutput ? TRUE : FALSE;
+    return type == kIOHIDElementTypeInput_Misc || type == kIOHIDElementTypeInput_Button ||
+        type == kIOHIDElementTypeInput_Axis || type == kIOHIDElementTypeInput_ScanCodes ? TRUE : FALSE;
+}
+static inline BYTE catio_mac_type(IOHIDElementRef e, BOOL input) {
+    if (!catio_mac_direction(e, input)) return 0;
+    if (IOHIDElementIsArray(e) || IOHIDElementGetReportCount(e) != 1 ||
+        IOHIDElementGetReportSize(e) == 0 || IOHIDElementGetReportSize(e) > 32) return 0;
     CFIndex low = IOHIDElementGetLogicalMin(e), high = IOHIDElementGetLogicalMax(e);
     if (low < CATALYST_INT_MIN || high > CATALYST_INT_MAX || low > high) return 0;
-    if (input && IOHIDElementIsRelative(e)) return 3;
+    if (IOHIDElementIsRelative(e)) return input ? 3 : 0;
     return low == 0 && high == 1 ? 1 : 2;
 }
 static inline STATUS_CODE catio_mac_channels(CATIO_MAC_RESOURCE* io, BOOL input) {
@@ -100,13 +105,13 @@ static inline STATUS_CODE catio_mac_channels(CATIO_MAC_RESOURCE* io, BOOL input)
     io->channels = (CATIO_MAC_CHANNEL*) memory;
     for (CFIndex j = 0; j < count; ++j) {
         IOHIDElementRef element = (IOHIDElementRef) CFArrayGetValueAtIndex(io->elements, j);
+        if (!catio_mac_direction(element, input)) continue;
         BYTE type = catio_mac_type(element, input);
-        if (!type) continue;
         CATIO_MAC_CHANNEL* c = &io->channels[io->count++];
         c->element = element; c->type = type;
         catio_mac_hex(c->identifier, (CATALYST_ULONG) IOHIDElementGetCookie(element), 16);
     }
-    return io->count ? STATUS_CODE_SUCCESS : STATUS_CODE_ERROR_NOT_IMPLEMENTED;
+    return io->count ? STATUS_CODE_SUCCESS : STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED;
 }
 static inline STATUS_CODE catio_mac_close(CATIO_MAC_RESOURCE* io) {
     if (io->device) {

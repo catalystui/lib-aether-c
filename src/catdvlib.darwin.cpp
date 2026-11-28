@@ -60,9 +60,9 @@ static STATUS_CODE catdv_mac_entry(CATDVLIB_DEVICES* devices, IOHIDDeviceRef hid
     if (elements) {
         d->capability_status = STATUS_CODE_SUCCESS;
         for (CFIndex j = 0; j < CFArrayGetCount(elements); ++j) {
-            IOHIDElementType t = IOHIDElementGetType((IOHIDElementRef) CFArrayGetValueAtIndex(elements, j));
-            if (t >= kIOHIDElementTypeInput_Misc && t <= kIOHIDElementTypeInput_ScanCodes) d->input = TRUE;
-            if (t == kIOHIDElementTypeOutput) d->output = TRUE;
+            IOHIDElementRef element = (IOHIDElementRef) CFArrayGetValueAtIndex(elements, j);
+            if (catio_mac_direction(element, TRUE)) d->input = TRUE;
+            if (catio_mac_direction(element, FALSE)) d->output = TRUE;
         }
         CFRelease(elements);
     } else d->capability_status = STATUS_CODE_ERROR_NOT_FOUND;

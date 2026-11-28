@@ -7,7 +7,8 @@ static void test_input(TestReport* report, CATINLIB_INPUT* input) {
     RESULT c = catalyst::input::device_get_channel_count(input, &cppCount);
     report->check(same_result(r, c) && count == cppCount, "channel count parity");
     if (report->result("channel count", r, 0x04)) {
-        if (!count) report->skip("no typed channels");
+        if (!count) report->skip("no channels");
+        NUINT rawOnly = 0;
         for (NUINT j = 0; j < count; ++j) {
             CATINLIB_CHANNEL_TYPE type = CATINLIB_CHANNEL_UNKNOWN, cppType = CATINLIB_CHANNEL_UNKNOWN;
             r = catin_channel_get_type(input, j, &type); c = catalyst::input::channel_get_type(input, j, &cppType);
@@ -18,6 +19,7 @@ static void test_input(TestReport* report, CATINLIB_INPUT* input) {
             if (report->result("channel identifier", r, 0x06))
                 report->check(same_identifier(id, cppId) && same_result(r, c), "channel identifier parity");
             else report->check(!id.scheme && !id.value, "channel identifier failure outputs");
+            if (type == CATINLIB_CHANNEL_UNKNOWN) ++rawOnly;
             if (type == CATINLIB_CHANNEL_DIGITAL) {
                 BOOL state = FALSE;
                 r = catalyst::input::digital_get_state(input, j, &state);
@@ -48,6 +50,8 @@ static void test_input(TestReport* report, CATINLIB_INPUT* input) {
             }
 #endif
         }
+        std::printf("Channels: %lu total; %lu without scalar interpretation\n",
+            (unsigned long) count, (unsigned long) rawOnly);
     } else report->check(!count, "channel count failure output");
     BYTE buffer[4097];
     std::memset(buffer, 0xA5, sizeof(buffer));

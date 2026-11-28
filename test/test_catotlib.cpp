@@ -11,7 +11,8 @@ static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write)
     RESULT c = catalyst::output::device_get_channel_count(output, &cppCount);
     report->check(same_result(r, c) && count == cppCount, "channel count parity");
     if (report->result("channel count", r, 0x04)) {
-        if (!count) report->skip("no typed channels");
+        if (!count) report->skip("no channels");
+        NUINT rawOnly = 0;
         for (NUINT j = 0; j < count; ++j) {
             CATOTLIB_CHANNEL_TYPE type = CATOTLIB_CHANNEL_UNKNOWN, cppType = CATOTLIB_CHANNEL_UNKNOWN;
             r = catot_channel_get_type(output, j, &type); c = catalyst::output::channel_get_type(output, j, &cppType);
@@ -22,6 +23,7 @@ static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write)
             if (report->result("channel identifier", r, 0x06))
                 report->check(same_identifier(id, cppId) && same_result(r, c), "channel identifier parity");
             else report->check(!id.scheme && !id.value, "channel identifier failure outputs");
+            if (type == CATOTLIB_CHANNEL_UNKNOWN) ++rawOnly;
             if (type == CATOTLIB_CHANNEL_DIGITAL) {
                 BOOL state = FALSE;
                 r = catot_digital_get_state(output, j, &state);
@@ -73,6 +75,8 @@ static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write)
             }
 #endif
         }
+        std::printf("Channels: %lu total; %lu without scalar interpretation\n",
+            (unsigned long) count, (unsigned long) rawOnly);
     } else report->check(!count, "channel count failure output");
     /* Zero bytes cannot be a complete native record; no hardware is changed. */
     BYTE dummy = 0;
