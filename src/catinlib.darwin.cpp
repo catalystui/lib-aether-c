@@ -8,7 +8,7 @@ struct CATINLIB_INPUT {
 };
 
 static STATUS_CODE catin_mac_peek(CATINLIB_INPUT* input) {
-    if (!input->pending) input->pending = IOHIDQueueCopyNextValueWithTimeout(input->queue, 0);
+    if (!input->pending) input->pending = IOHIDQueueCopyNextValue(input->queue);
     return input->pending ? STATUS_CODE_SUCCESS : STATUS_CODE_SUCCESS_NOOP;
 }
 static void catin_mac_consume(CATINLIB_INPUT* input) {
@@ -32,8 +32,15 @@ CATALYST_RESULT catin_device_open(const CATDVLIB_DEVICE* device, CATINLIB_INPUT*
         resource->queue = IOHIDQueueCreate(kCFAllocatorDefault, resource->io.device, 256, kIOHIDOptionsTypeNone);
         if (!resource->queue) status = STATUS_CODE_ERROR_ALLOCATION_FAILED;
         else {
-            for (NUINT j = 0; j < resource->io.count; ++j) IOHIDQueueAddElement(resource->queue, resource->io.channels[j].element);
-            IOHIDQueueStart(resource->queue);
+            for (NUINT j = 0; j < resource->io.count; ++j) {
+                IOHIDElementRef element = resource->io.channels[j].element;
+                IOHIDQueueAddElement(resource->queue, element);
+                if (!IOHIDQueueContainsElement(resource->queue, element)) {
+                    status = STATUS_CODE_ERROR_IO_ERROR;
+                    break;
+                }
+            }
+            if (status == STATUS_CODE_SUCCESS) IOHIDQueueStart(resource->queue);
         }
     }
     if (status != STATUS_CODE_SUCCESS) {
@@ -96,7 +103,7 @@ CATALYST_RESULT catin_digital_read(CATINLIB_INPUT* input, CATALYST_NUINT channel
     if (c->type != CATINLIB_CHANNEL_DIGITAL) return RESULT(STATUS_CODE_ERROR_INVALID_ARGUMENT, 0x08, 0x01, 1);
     STATUS_CODE status = catin_mac_peek(input);
     if (status != STATUS_CODE_SUCCESS) return RESULT(status, 0x08, 0x02, 0);
-    if (IOHIDValueGetElement(input->pending) != c->element) return RESULT(STATUS_CODE_SUCCESS_NOOP, 0x08, 0x03, 0);
+    if (IOHIDElementGetCookie(IOHIDValueGetElement(input->pending)) != IOHIDElementGetCookie(c->element)) return RESULT(STATUS_CODE_SUCCESS_NOOP, 0x08, 0x03, 0);
     CFIndex value = IOHIDValueGetIntegerValue(input->pending);
     if (value != 0 && value != 1) return RESULT(STATUS_CODE_ERROR_MALFORMED_INPUT, 0x08, 0x04, 0);
     *action = value ? CATINLIB_DIGITAL_PRESS : CATINLIB_DIGITAL_RELEASE;
@@ -130,7 +137,7 @@ CATALYST_RESULT catin_relative_read(CATINLIB_INPUT* input, CATALYST_NUINT channe
     if (c->type != CATINLIB_CHANNEL_RELATIVE) return RESULT(STATUS_CODE_ERROR_INVALID_ARGUMENT, 0x0B, 0x01, 1);
     STATUS_CODE status = catin_mac_peek(input);
     if (status != STATUS_CODE_SUCCESS) return RESULT(status, 0x0B, 0x02, 0);
-    if (IOHIDValueGetElement(input->pending) != c->element) return RESULT(STATUS_CODE_SUCCESS_NOOP, 0x0B, 0x03, 0);
+    if (IOHIDElementGetCookie(IOHIDValueGetElement(input->pending)) != IOHIDElementGetCookie(c->element)) return RESULT(STATUS_CODE_SUCCESS_NOOP, 0x0B, 0x03, 0);
     CFIndex n = IOHIDValueGetIntegerValue(input->pending);
     if (n < CATALYST_INT_MIN || n > CATALYST_INT_MAX) return RESULT(STATUS_CODE_ERROR_MALFORMED_INPUT, 0x0B, 0x05, 0);
     *offset = (CATALYST_INT) n; catin_mac_consume(input); return RESULT(STATUS_CODE_SUCCESS, 0x0B, 0x04, 0);
