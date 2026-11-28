@@ -9,9 +9,15 @@
 
 Production code uses Catalyst Core for memory operations and text validation. Linux native filesystem and evdev interfaces require the platform's POSIX/Linux ABI (normally supplied by libc); sysfs and `/proc/self/fd` must be accessible for device resolution. No general-purpose C/C++ standard-library string, formatting, allocation or conversion routines are called directly by these modules. This is not a freestanding or libc-free binary guarantee.
 
-This initial implementation supports Linux evdev endpoints only. Other discovered native device kinds return ERROR_NOT_IMPLEMENTED when opened. Windows and Darwin return ERROR_NOT_IMPLEMENTED for reporting operations. No native objects are created there. All pointers and indices must meet header preconditions; synchronize access externally. Numeric values are native integer measurements, not normalized; 32-bit measurement APIs require CATALYST_SUPPORTS_32BIT.
+This initial implementation supports Linux evdev endpoints only. Other discovered native device kinds return ERROR_NOT_IMPLEMENTED when opened. Windows and Darwin have native backends with the additional platform-specific contracts below. All pointers and indices must meet header preconditions; synchronize access externally. Numeric values are native integer measurements, not normalized; 32-bit measurement APIs require CATALYST_SUPPORTS_32BIT.
 
 A successful open owns a native descriptor and is independent of the snapshot. Raw reads return one Linux struct input_event in native layout (including timestamps and SYN events). Typed digital/relative reads examine the same head event; a different channel or SYN event returns SUCCESS_NOOP without consuming it. Use a raw read to advance past an unmatched event; no-op action/offset is not an event. SYN_DROPPED requires consumer resynchronization. Close consumes the descriptor even when Linux reports an error; memory-release failure is retryable.
+
+### Windows and Darwin backend coverage
+
+Windows opens HID collection paths with overlapped ReadFile and returns one complete native HID input report, including its report-ID byte. If a read is pending it returns SUCCESS_NOOP; the next read polls completion. The caller must provide capacity for the device's complete report. Windows typed channel parsing and state queries return ERROR_NOT_IMPLEMENTED. System-reserved keyboard and mouse collections may deny raw access. Darwin exposes scalar HID input elements and native logical ranges, using IOHIDQueue with depth 256 and one pending value. Its raw event is a native IOHIDElementCookie followed immediately by the bytes of IOHIDValue; a short buffer preserves the pending value. Typed reads preserve ordering; digital repeat is not synthesized. Native queues can lose events under load. Native value queries may block. Release drains outstanding Windows overlapped operations before freeing memory.
+
+The existing Linux result tables describe Linux operation sites. Native Windows and Darwin outcomes use the same Result status definitions and fixed method contexts; their detailed operation-site tables require platform verification. No third-party runtime is introduced; Windows uses SetupAPI/HID and macOS uses IOKit/CoreFoundation. Native hardware execution is unverified.
 
 ## Types and constants
 
@@ -60,7 +66,7 @@ CATALYST_RESULT catin_device_open(const CATDVLIB_DEVICE* device, CATINLIB_INPUT*
 
 ### catin_device_close
 
-Release the resource; a failed memory release can be retried, but Linux close consumes the descriptor even on error.
+Release the resource according to the native backend's lifetime contract; see platform usage notes.
 
 ```c
 CATALYST_RESULT catin_device_close(CATINLIB_INPUT* input);

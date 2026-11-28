@@ -1,0 +1,92 @@
+#include "catdvlib.native.hpp"
+
+CATALYST_RESULT catdv_devices_free(CATDVLIB_DEVICES* devices) {
+    if (devices->data) {
+        RESULT r = catmm_free(devices->data);
+        if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return RESULT(r.status, 0x02, 0x01, r.detail);
+        devices->data = 0; devices->count = 0; devices->capacity = 0;
+    }
+    RESULT r = catmm_free(devices);
+    return RESULT(r.status, 0x02, 0x02, r.detail);
+}
+
+CATALYST_NUINT catdv_devices_get_count(const CATDVLIB_DEVICES* devices) {
+    return devices->count;
+}
+
+const CATDVLIB_DEVICE* catdv_devices_get(const CATDVLIB_DEVICES* devices, CATALYST_NUINT index) {
+    return &devices->data[index];
+}
+
+CATDVLIB_DEVICE_TYPE catdv_device_get_type(const CATDVLIB_DEVICE* device) {
+    return device->type;
+}
+
+CATALYST_RESULT catdv_device_get_identifier(const CATDVLIB_DEVICE* device, CATDVLIB_IDENTIFIER* identifier) {
+    identifier->scheme = 0; identifier->value = 0;
+    if (device->identifier.status != CATALYST_STATUS_CODE_SUCCESS) return RESULT(device->identifier.status, 0x06, 0x01, 0);
+    identifier->scheme = device->scheme; identifier->value = device->identifier.value;
+    return RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x06, 0x02, 0);
+}
+
+CATALYST_RESULT catdv_device_get_hwid_count(const CATDVLIB_DEVICE* device, CATALYST_NUINT* count) {
+    *count = 0;
+    if (device->hwid_status != CATALYST_STATUS_CODE_SUCCESS) return RESULT(device->hwid_status, 0x07, 0x01, 0);
+    *count = device->hwid_count;
+    return RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x07, 0x02, 0);
+}
+
+CATALYST_RESULT catdv_device_get_hwid(const CATDVLIB_DEVICE* device, CATALYST_NUINT index, CATDVLIB_IDENTIFIER* hwid) {
+    hwid->scheme = device->hwid_scheme; hwid->value = device->hwids[index].value;
+    return RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x08, 0x01, 0);
+}
+
+CATALYST_RESULT catdv_device_get_serial(const CATDVLIB_DEVICE* device, CATALYST_UTF8* serial) {
+    *serial = 0;
+    if (device->serial.status != CATALYST_STATUS_CODE_SUCCESS) return RESULT(device->serial.status, 0x09, 0x01, 0);
+    *serial = device->serial.value;
+    return RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x09, 0x02, 0);
+}
+
+CATALYST_RESULT catdv_device_get_manufacturer(const CATDVLIB_DEVICE* device, CATALYST_UTF8* manufacturer) {
+    *manufacturer = 0;
+    if (device->manufacturer.status != CATALYST_STATUS_CODE_SUCCESS) return RESULT(device->manufacturer.status, 0x0A, 0x01, 0);
+    *manufacturer = device->manufacturer.value;
+    return RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x0A, 0x02, 0);
+}
+
+CATALYST_RESULT catdv_device_get_product(const CATDVLIB_DEVICE* device, CATALYST_UTF8* product) {
+    *product = 0;
+    if (device->product.status != CATALYST_STATUS_CODE_SUCCESS) return RESULT(device->product.status, 0x0B, 0x01, 0);
+    *product = device->product.value;
+    return RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x0B, 0x02, 0);
+}
+
+CATALYST_RESULT catdv_device_get_descriptor(const CATDVLIB_DEVICE* device, CATALYST_UTF8* descriptor) {
+    *descriptor = 0;
+    if (device->descriptor.status != CATALYST_STATUS_CODE_SUCCESS) return RESULT(device->descriptor.status, 0x0C, 0x01, 0);
+    *descriptor = device->descriptor.value;
+    return RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x0C, 0x02, 0);
+}
+
+CATALYST_RESULT catdv_device_get_revision(const CATDVLIB_DEVICE* device, CATALYST_UTF8* revision) {
+    *revision = 0;
+    if (device->revision.status != CATALYST_STATUS_CODE_SUCCESS) return RESULT(device->revision.status, 0x0D, 0x01, 0);
+    *revision = device->revision.value;
+    return RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x0D, 0x02, 0);
+}
+
+CATALYST_RESULT catdv_device_has_input(const CATDVLIB_DEVICE* device, CATALYST_BOOL* supported) {
+    *supported = CATALYST_FALSE;
+    if (device->capability_status != CATALYST_STATUS_CODE_SUCCESS) return RESULT(device->capability_status, 0x0E, 0x02, 0);
+    *supported = device->input;
+    return RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x0E, 0x03, 0);
+}
+
+CATALYST_RESULT catdv_device_has_output(const CATDVLIB_DEVICE* device, CATALYST_BOOL* supported) {
+    *supported = CATALYST_FALSE;
+    if (device->capability_status != CATALYST_STATUS_CODE_SUCCESS) return RESULT(device->capability_status, 0x0F, 0x02, 0);
+    *supported = device->output;
+    return RESULT(CATALYST_STATUS_CODE_SUCCESS, 0x0F, 0x03, 0);
+}
+

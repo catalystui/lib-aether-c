@@ -9,9 +9,15 @@
 
 Production code uses Catalyst Core for memory operations and text validation. Linux native filesystem and evdev interfaces require the platform's POSIX/Linux ABI (normally supplied by libc); sysfs and `/proc/self/fd` must be accessible for device resolution. No general-purpose C/C++ standard-library string, formatting, allocation or conversion routines are called directly by these modules. This is not a freestanding or libc-free binary guarantee.
 
-This initial implementation supports Linux evdev endpoints only. Other discovered native device kinds return ERROR_NOT_IMPLEMENTED when opened. Windows and Darwin return ERROR_NOT_IMPLEMENTED for reporting operations. No native objects are created there. All pointers and indices must meet header preconditions; synchronize access externally. Numeric values are native integer measurements, not normalized; 32-bit measurement APIs require CATALYST_SUPPORTS_32BIT.
+This initial implementation supports Linux evdev endpoints only. Other discovered native device kinds return ERROR_NOT_IMPLEMENTED when opened. Windows and Darwin have native backends with the additional platform-specific contracts below. All pointers and indices must meet header preconditions; synchronize access externally. Numeric values are native integer measurements, not normalized; 32-bit measurement APIs require CATALYST_SUPPORTS_32BIT.
 
 A successful open owns a native descriptor independently of the snapshot. Only EV_LED channels and single EV_LED records are implemented; force feedback, sound, display and audio are not implemented. Raw writes require exactly sizeof(struct input_event), with valid LED code and 0/1 value; native timestamps are ignored. Absolute output is unsupported by this backend. Close consumes the descriptor even when Linux reports an error; memory-release failure is retryable.
+
+### Windows and Darwin backend coverage
+
+Windows opens HID collection paths for overlapped WriteFile and accepts exactly one complete native HID output report including its report-ID byte. SUCCESS_NOOP means pending completion: retry with identical bytes until completion; different bytes while pending return ERROR_INVALID_STATE. Windows typed channels are not implemented. Darwin exposes scalar HID output elements and native logical bounds. Digital/absolute setters submit a native asynchronous IOHIDDeviceSetValueWithCallback; retry with the same channel and value until completion, using the opening thread's run loop. Different requests while pending return ERROR_INVALID_STATE; close may return ERROR_INVALID_STATE until the pending callback completes. Raw report writes on Darwin return ERROR_NOT_IMPLEMENTED. Get-value calls use native IOKit and may block. No force feedback/audio/display abstraction is provided.
+
+The existing Linux result tables describe Linux operation sites. Native Windows and Darwin outcomes use the same Result status definitions and fixed method contexts; their detailed operation-site tables require platform verification. No third-party runtime is introduced; Windows uses SetupAPI/HID and macOS uses IOKit/CoreFoundation. Native hardware execution is unverified.
 
 ## Types and constants
 
@@ -54,7 +60,7 @@ CATALYST_RESULT catot_device_open(const CATDVLIB_DEVICE* device, CATOTLIB_OUTPUT
 
 ### catot_device_close
 
-Release the resource; a failed memory release can be retried, but Linux close consumes the descriptor even on error.
+Release the resource according to the native backend's lifetime contract; see platform usage notes.
 
 ```c
 CATALYST_RESULT catot_device_close(CATOTLIB_OUTPUT* output);
@@ -76,7 +82,7 @@ CATALYST_RESULT catot_device_close(CATOTLIB_OUTPUT* output);
 
 ### catot_device_write
 
-Submit exactly one native LED event without blocking; written is zero on failure or no progress.
+Submit one complete native output record without blocking; written is zero on failure or pending completion.
 
 ```c
 CATALYST_RESULT catot_device_write(CATOTLIB_OUTPUT* output, CATMMLIB_POINTER data, CATALYST_NUINT size, CATALYST_NUINT* written);

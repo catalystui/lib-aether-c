@@ -47,7 +47,7 @@ typedef CATALYST_BYTE CATINLIB_DIGITAL_ACTION;
 /** Acquire a live native input resource independently of the device snapshot; null on failure. */
 CATINLIB_API CATALYST_RESULT catin_device_open(const CATDVLIB_DEVICE* device, CATINLIB_INPUT** input);
 
-/** Release the resource; a failed memory release can be retried, but Linux close consumes the descriptor even on error. */
+/** Release the resource according to the native backend's lifetime contract; see platform usage notes. */
 CATINLIB_API CATALYST_RESULT catin_device_close(CATINLIB_INPUT* input);
 
 /** Read at most one native event without blocking; capacity must accommodate a complete event, received is zero on failure or no data. */

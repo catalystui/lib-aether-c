@@ -41,10 +41,10 @@ typedef CATALYST_BYTE CATOTLIB_CHANNEL_TYPE;
 /** Acquire a live native output resource independently of the device snapshot; null on failure. */
 CATOTLIB_API CATALYST_RESULT catot_device_open(const CATDVLIB_DEVICE* device, CATOTLIB_OUTPUT** output);
 
-/** Release the resource; a failed memory release can be retried, but Linux close consumes the descriptor even on error. */
+/** Release the resource according to the native backend's lifetime contract; see platform usage notes. */
 CATOTLIB_API CATALYST_RESULT catot_device_close(CATOTLIB_OUTPUT* output);
 
-/** Submit exactly one native LED event without blocking; written is zero on failure or no progress. */
+/** Submit one complete native output record without blocking; written is zero on failure or pending completion. */
 CATOTLIB_API CATALYST_RESULT catot_device_write(CATOTLIB_OUTPUT* output, CATMMLIB_POINTER data, CATALYST_NUINT size, CATALYST_NUINT* written);
 
 /** Retrieve the number of individually accessible channels; zero on failure. */
