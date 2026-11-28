@@ -1,5 +1,8 @@
 #include "device_io_test.hpp"
 #include "catotlib.hpp"
+#if TARGET_PLATFORM_LINUX
+#include <linux/input.h>
+#endif
 
 /* Writes are opt-in and reapply the currently observed value only. */
 static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write) {
@@ -30,7 +33,22 @@ static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write)
                             if (r.status != STATUS_CODE_SUCCESS_NOOP) break;
                         }
                         if (r.status == STATUS_CODE_SUCCESS_NOOP) { report->skip("digital write still pending; stop submitting"); break; }
-                        report->result("reapply digital state", r, 0x08);
+                        if (report->result("reapply digital state", r, 0x08)) {
+#if TARGET_PLATFORM_LINUX
+                            unsigned eventType, eventCode;
+                            if (valid_identifier(id) && std::strcmp((const char*) id.scheme, "linux-evdev") == 0 &&
+                                std::sscanf((const char*) id.value, "%u:%u", &eventType, &eventCode) == 2 &&
+                                eventType == EV_LED && eventCode < LED_CNT) {
+                                struct input_event event;
+                                std::memset(&event, 0, sizeof(event));
+                                event.type = EV_LED; event.code = (unsigned short) eventCode; event.value = state ? 1 : 0;
+                                NUINT written = 0;
+                                r = catalyst::output::device_write(output, &event, sizeof(event), &written);
+                                if (report->result("native LED record", r, 0x03, true))
+                                    report->check(r.status == STATUS_CODE_SUCCESS ? written == sizeof(event) : written == 0, "native write extent");
+                            } else report->skip("no known native LED record");
+#endif
+                        }
                     }
                 } else report->check(!state, "state failure output");
             }
@@ -94,8 +112,10 @@ int main(int argc, char** argv) {
         test_output(&report, output, write);
         r = catalyst::output::device_close(output);
         /* Darwin may need to finish the asynchronous request before close. */
+#if TARGET_PLATFORM_DARWIN
         for (unsigned long attempt = 0; r.status == STATUS_CODE_ERROR_INVALID_STATE && attempt < 100000; ++attempt)
             r = catalyst::output::device_close(output);
+#endif
         report.result("close output", r, 0x02);
     }
     if (!opened) report.skip("no accessible output device");

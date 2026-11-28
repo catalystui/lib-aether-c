@@ -140,6 +140,14 @@ static inline int benchmark_io(const char* name, PerfCall call, void* fixture, B
         (b.result.status != STATUS_CODE_SUCCESS && b.result.status != STATUS_CODE_SUCCESS_NOOP)) {
         std::printf("  Unavailable or failed: C %02X, C++ %02X\n",
             (unsigned) a.result.status, (unsigned) b.result.status);
+        STATUS_CODE statuses[] = {a.result.status, b.result.status};
+        for (BYTE j = 0; j < 2; ++j) {
+            STATUS_CODE s = statuses[j];
+            if (s != STATUS_CODE_SUCCESS && s != STATUS_CODE_SUCCESS_NOOP &&
+                s != STATUS_CODE_ERROR_NOT_FOUND && s != STATUS_CODE_ERROR_ACCESS_DENIED &&
+                s != STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED && s != STATUS_CODE_ERROR_NOT_IMPLEMENTED)
+                return 1;
+        }
         return 2;
     }
     if (stable && (!same_result(a.result, b.result) || a.digest != b.digest)) {
