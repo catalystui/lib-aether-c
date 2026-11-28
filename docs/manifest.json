@@ -15,14 +15,14 @@
         {
             "title": "API Reference",
             "path": "/api-reference",
+            "alignment": "block",
             "children": [
                 {
                     "title": "CATSYLIB",
                     "path": "/api-reference/catsylib",
                     "alignment": "block"
                 }
-            ],
-            "alignment": "block"
+            ]
         }
     ]
 }
