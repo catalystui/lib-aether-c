@@ -18,12 +18,23 @@
 
 Aether is the system library for CatalystUI, implementing **Layer 1: System** of the CatalystUI model through a native C ABI.
 
-Aether aims to make native system-level bindings and operating system services accessible through consistent, portable contracts while preserving the capabilities of each native platform. Aether is focused on the underlying system itself; windowing is the responsibility of Crystal.
+Aether aims to make native system-level bindings and operating system services accessible through consistent, portable contracts while preserving the capabilities of each native platform. Aether identifies and exposes native system facilities without inventing missing capabilities. It does not implement a general-purpose device communication framework. Windowing is the responsibility of Crystal.
 
 ## Development Status
 
 > [!NOTE]
-> This implementation is in its earliest stage of development. The shared build environment is in place, but public APIs, the library implementation, and runtime support have not yet been added.
+> Aether is in early development (1.0.0-alpha.1). Native system identification and device discovery are implemented for Windows, macOS, and Linux. Coverage varies by platform; API and ABI stability are not yet guaranteed.
+
+## Libraries
+
+| Library | Headers | Purpose |
+| --- | --- | --- |
+| [CATSYLIB](docs/lang/en-US/api-reference/catsylib/index.md) | `catsylib.h`, `catsylib.hpp` | Operating system, distribution, architecture, and hostname identification. |
+| [CATDVLIB](docs/lang/en-US/api-reference/catdvlib/index.md) | `catdvlib.h`, `catdvlib.hpp` | Device discovery, hardware and instance identifiers, metadata, capability discovery, display identification, EDID acquisition, and native display lookup. |
+
+Display discovery uses Win32 monitor interfaces, CoreGraphics display IDs, or Linux DRM connectors. EDID availability depends on the native system; Aether returns the bytes supplied by the OS without interpreting or synthesizing them. Numeric native display handles are supported on Windows and macOS; Linux connectors use exact instance identifiers.
+
+See the [documentation](docs/lang/en-US/index.md) and [API reference](docs/lang/en-US/api-reference/index.md) for contracts and platform limitations.
 
 ## Getting Started
 
@@ -47,9 +58,25 @@ The shared presets define target-specific compiler and platform configurations. 
 
 ```powershell
 cmake --preset aclang17-darwin24.6-arm64
+cmake --build --preset aclang17-darwin24.6-arm64-release
 ```
 
-There are currently no library targets to compile. Preset availability depends on the host and installed toolchain; the presence of a preset does not imply verified runtime support.
+Aether uses Core's exported CMake targets, retrieving a pinned Core revision automatically when no parent-provided targets are available. An installed Core package can also be selected explicitly; see the documentation for configuration details.
+
+Source consumers can link `Catalyst::catsy_static`, `Catalyst::catsy_shared`, `Catalyst::catdv_static`, or `Catalyst::catdv_shared`. Preset availability depends on the installed toolchain.
+
+## Verification
+
+Standalone verification and performance programs are enabled by default for top-level builds. From the configured Release output directory, run:
+
+```powershell
+./test_catsylib
+./test_catdvlib
+./perf_catsylib
+./perf_catdvlib
+```
+
+System identification, HID discovery, display identification, and independent primary-display handle lookup have been exercised on macOS ARM64. The internal display's EDID was unavailable through the current public IOKit path. Successful EDID retrieval and Windows/Linux display hardware execution still require verification. Missing native properties are reported separately from failures.
 
 ## AI-Assisted Development
 

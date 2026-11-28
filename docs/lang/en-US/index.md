@@ -29,7 +29,7 @@ Aether implements Layer 1: System of the CatalystUI model. It exposes native sys
 Aether exposes capabilities that are system-specific or not available on every Catalyst-compatible system. It preserves native availability and does not emulate unsupported facilities. Windowing belongs to Crystal. Aether identifies system and device facilities; discovery does not implement general-purpose device communication, event processing or report submission.
 
 > [!NOTE]
-> Aether is in early development (1.0.0-alpha.1). Native system identification and initial device discovery are implemented for Windows, macOS, and Linux; discovery coverage varies by platform. API and ABI stability are not yet guaranteed.
+> Aether is in early development (1.0.0-alpha.1). Native system identification and initial device and display discovery are implemented for Windows, macOS, and Linux; native metadata and EDID availability vary by platform. API and ABI stability are not yet guaranteed.
 
 ## Libraries
 
@@ -43,10 +43,11 @@ Aether exposes capabilities that are system-specific or not available on every C
 <small style="opacity:0.8;margin-top:auto;">Link: <code>catsy</code></small>
 </div>
 <div style="flex:1 1 calc(50% - 0.5rem);min-width:min(100%, 15rem);box-sizing:border-box;padding:1.2rem;border:1px solid color-mix(in srgb, currentColor 19%, transparent);border-radius:12px;background:color-mix(in srgb, currentColor 3%, transparent);display:flex;flex-direction:column;align-items:center;text-align:center;">
+<svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;width:32px;height:32px;margin:0.15rem auto 0.8rem;opacity:0.9;"><rect x="3" y="3" width="12" height="9" rx="1.5"/><path d="M9 12v3M6 15h6"/><rect x="16" y="10" width="5" height="11" rx="1"/><path d="M18 18h1"/></svg>
 
 **[CATDVLIB](api-reference/catdvlib/index.md)**
 
-<p style="margin:0 0 0.85rem;max-width:20rem;">Discover native devices, hardware and instance identifiers, metadata, and available capabilities.</p>
+<p style="margin:0 0 0.85rem;max-width:20rem;">Discover native devices and displays, retrieve hardware and instance identifiers and EDID, and resolve native display handles.</p>
 <small style="opacity:0.8;margin-top:auto;">Link: <code>catdv</code></small>
 </div>
 </div>
@@ -94,7 +95,20 @@ Aether exposes `Catalyst::catsy_static`, `Catalyst::catsy_shared`, `Catalyst::ca
 
 ## Verification
 
-Run `test_catsylib` to verify available query contracts, and `perf_catsylib` in Release to compare size and output queries. The performance program compares the native backend with public C and C++ entry points; independent direct native references are shown where matching output is available. The independent references do not duplicate all validation, so their timings do not isolate reporting overhead. Direct native references calibrate their own sample count to accommodate especially fast operations. Both programs report unavailable queries separately from failures.
+Run the standalone programs from the configured output directory, using Release for performance measurements:
+
+```powershell
+./test_catsylib
+./test_catdvlib
+./perf_catsylib
+./perf_catdvlib
+```
+
+CATSYLIB verification covers system identification and short-buffer preservation. CATDVLIB verifies snapshot ownership, metadata, exact instance lookup, display identification, available EDID bytes, and native display lookup. On Windows and macOS the test obtains the primary display handle independently from the OS. Use `test_catdvlib --verbose` for individual successful checks.
+
+Performance programs compare the public C API and C++ wrappers using CPU-time samples. CATSYLIB also measures its backend and independent native references where equivalent values are available; direct references omit some validation. CATDVLIB measures full enumeration, cached metadata and EDID retrieval, and instance and native handle lookups. Its direct Darwin HID discovery reference is narrower than full enumeration and is not an equivalent overhead baseline. Unavailable capabilities are reported separately from failures.
+
+The configured Linux CI builds pass. macOS ARM64 manual verification covers system identification and device discovery, including display identification and primary-display lookup (514 CATDVLIB checks passed, no failures). The internal display did not expose EDID through the current acquisition path. Successful EDID acquisition and Windows/Linux display hardware execution remain unverified.
 
 ## AI-Assisted Development
 

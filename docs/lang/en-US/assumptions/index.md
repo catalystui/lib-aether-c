@@ -39,7 +39,7 @@ Aether uses Core's foundational representations. The C++ aliases of C types pres
 </div>
 </div>
 
-A target may lack a capability, a particular value, or permission to retrieve it. These are distinct operational conditions. Aether does not invent missing native data or emulate unsupported facilities. Windowing belongs to Crystal.
+A target may lack a capability, a particular value, or permission to retrieve it. These are distinct operational conditions. Aether does not invent missing native data or emulate unsupported facilities. It exposes native identity, metadata, capability discovery, and native interoperability without imposing a general-purpose device communication or event-processing model. Aether acquires native EDID bytes; interpreting their contents is outside its acquisition contract. Windowing belongs to Crystal.
 
 ## Numerics and Arithmetic
 

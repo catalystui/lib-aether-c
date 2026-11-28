@@ -1,41 +1,123 @@
 # CATDVLIB
 
-**Headers:** `catdvlib.h`, `catdvlib.hpp`  
+Provides native device and display discovery, identification, and interoperability.
+
+**C Header:** `catdvlib.h`  
+**C++ Header:** `catdvlib.hpp`  
 **Namespace:** `catalyst::device`  
 **Library:** `catdv`  
-**Dependencies:** Catalyst Core (private memory/text implementation)
+**Dependencies:** CATALYST, CATMMLIB, CATTELIB; platform-native system APIs.  
+**Specification:** [FDEFSPEC](https://catalystui.org/specifications/languages/fdefspec/)
 
 ## Usage Notes
 
-Production code uses Catalyst Core for memory operations and text validation. Linux native filesystem and evdev interfaces require the platform's POSIX/Linux ABI (normally supplied by libc); sysfs and `/proc/self/fd` must be accessible for device resolution. No general-purpose C/C++ standard-library string, formatting, allocation or conversion routines are called directly by these modules. This is not a freestanding or libc-free binary guarantee.
+Production code uses Catalyst Core for memory operations and text validation. Linux native filesystem interfaces require the platform's POSIX/Linux ABI (normally supplied by libc); sysfs and `/proc/self/fd` must be accessible for device resolution. No general-purpose C/C++ standard-library string, formatting, allocation or conversion routines are called directly by these modules. This is not a freestanding or libc-free binary guarantee.
 
-This initial implementation supports Linux USB/PCI sysfs and evdev device discovery; hardware IDs include native modalias strings plus supported bus/model identifiers. Windows and Darwin have native backends with the additional platform-specific contracts below. All pointers and indices must meet header preconditions; synchronize access externally. Numeric values are native integer measurements, not normalized; 32-bit measurement APIs require CATALYST_SUPPORTS_32BIT.
+All pointers and indices must meet header preconditions; synchronize access externally. Device records, identifier strings, metadata, and EDID bytes are borrowed from a live snapshot. For Aether-wide requirements, see [Assumptions](../../assumptions/index.md).
 
-Device snapshots are finite and retain metadata until freed. A Linux sysfs instance path identifies a kernel resource, not a permanent identity; hot-plug may invalidate or reuse it. Only evdev logical devices have queried I/O capabilities. Unknown properties return NOT_FOUND or the native error. Metadata exceeding 1023 bytes is reported as BUFFER_OVERFLOW. Connected DRM connectors are also enumerated as logical display endpoints. EDID is copied from the kernel's binary connector attribute, not parsed. HWIDs are not device instance identities. The `usb` and `pci` schemes use uppercase four-hex-digit `VID:PID` pairs, while `linux-input` uses `BUS:VID:PID` with four hex digits per field. The native `linux-modalias` scheme preserves the original sysfs text. USB interface entries retain the modalias rather than claiming the physical USB model identity. When both a bus/model identifier and a modalias exist, the bus/model identifier is first. If a snapshot free fails, retry on the same snapshot; do not use any old borrowed references.
+Device snapshots are finite and retain metadata until freed. A Linux sysfs instance path identifies a kernel resource, not a permanent identity; hot-plug may invalidate or reuse it. Linux enumerates USB/PCI sysfs devices and evdev endpoints; capability discovery is available for evdev endpoints and connected DRM display connectors. Unknown properties return NOT_FOUND or the native error. Metadata exceeding 1023 bytes is reported as BUFFER_OVERFLOW. Connected DRM connectors are also enumerated as logical display endpoints. EDID is copied from the kernel's binary connector attribute, not parsed. HWIDs are not device instance identities. The `usb` and `pci` schemes use uppercase four-hex-digit `VID:PID` pairs, while `linux-input` uses `BUS:VID:PID` with four hex digits per field. The native `linux-modalias` scheme preserves the original sysfs text. USB interface entries retain the modalias rather than claiming the physical USB model identity. When both a bus/model identifier and a modalias exist, the bus/model identifier is first. If a snapshot free fails, retry on the same snapshot; do not use any old borrowed references.
 
 ### Windows and Darwin backend coverage
 
-Windows enumerates present SetupAPI PnP device instances and HID interfaces as separate records. The `windows-pnp` and `windows-hid` instance schemes distinguish device instance IDs and interface paths. Up to sixteen native PnP hardware identifiers are preserved; an overflow is reported, not truncated. HID capabilities and manufacturer, product and serial properties are queried where the OS permits; generic PnP records have no inferred physical/logical classification or I/O capability. Darwin enumerates IOHIDManager devices only, using hexadecimal I/O registry entry IDs (`darwin-hid`), vendor/product IDs, and native HID properties. Input/output capability queries reflect native element direction only; they neither open a communication resource for callers nor interpret HID elements or transfer reports. Online CoreGraphics displays are enumerated separately from HID endpoints, and legacy public IOKit display information supplies EDID only when the native vendor/product/serial association is unambiguous. General Darwin USB/PCI enumeration, persistent identity, and arbitrary native-handle import remain unsupported. Windows and Darwin snapshots use Core allocation and native SDK interfaces.
+Windows enumerates present SetupAPI PnP device instances and HID interfaces as separate records. The `windows-pnp` and `windows-hid` instance schemes distinguish device instance IDs and interface paths. Up to sixteen native PnP hardware identifiers are preserved; an overflow is reported, not truncated. HID capabilities and manufacturer, product and serial properties are queried where the OS permits; generic PnP records have no inferred physical/logical classification or I/O capability. Darwin enumerates IOHIDManager devices and online CoreGraphics displays; HID records are identified using hexadecimal I/O registry entry IDs (`darwin-hid`), vendor/product IDs, and native HID properties. Input/output capability queries reflect native element direction only; they neither open a communication resource for callers nor interpret HID elements or transfer reports. Online CoreGraphics displays are enumerated separately from HID endpoints, and legacy public IOKit display information supplies EDID only when the native vendor/product/serial association is unambiguous. General Darwin USB/PCI enumeration, persistent identity, and arbitrary native-handle import remain unsupported. Windows and Darwin snapshots use Core allocation and native SDK interfaces.
 
-The existing Linux result tables describe Linux operation sites. Native Windows and Darwin outcomes use the same Result status definitions and fixed method contexts; their detailed operation-site tables require platform verification. No third-party runtime is introduced; Windows uses SetupAPI/HID and macOS uses IOKit/CoreFoundation. Native hardware execution is unverified.
+No third-party runtime is introduced. Windows uses SetupAPI, HID, User32, and registry APIs; macOS uses IOKit, CoreFoundation, and CoreGraphics. macOS ARM64 manual tests verified HID discovery, display identity and independent primary-display handle lookup. EDID was unavailable for the tested built-in display; successful EDID retrieval and Windows/Linux display hardware execution remain unverified.
+
+### Display identification and native interoperability
+
+Display endpoints are included in the same device snapshot. They are logical system records, not an assertion that each record is a distinct physical panel. They expose output capability without opening an output communication resource. No geometry, modes, rendering, windowing, EDID interpretation, DDC/CI, or private SDK APIs are included.
+
+- Windows: active monitor interfaces associated with Win32 monitor handles. `windows-monitor` identifies the exact monitor interface path; `windows-display-source` is used when no active monitor interface is exposed. SetupAPI opens the corresponding device registry key and reads its binary EDID value. Several monitor endpoints may share one HMONITOR (for example, cloned displays).
+- Darwin: online CGDirectDisplayID values identify `darwin-display` entries (eight uppercase hexadecimal digits). The model identifier uses the `darwin-display-model` scheme, with eight-digit vendor and product fields separated by a colon. A nonzero numeric CoreGraphics serial is exposed in hexadecimal. EDID comes from public IOKit IODisplayConnect dictionaries only when a single native association can be established; matching uses vendor, product and available serial values. Duplicate/ambiguous associations are reported rather than guessed. On Apple Silicon, including built-in panels, the public legacy property may be unavailable. No synthetic EDID or private AVService access is used.
+- Linux: connected DRM connectors are exposed as `linux-sysfs` canonical instance paths. The binary EDID attribute is read to EOF, with a 32768-byte bound; larger values report overflow. There is no single process-independent numeric X11/Wayland/DRM display handle. Use exact canonical connector identifiers for lookup. No libdrm, X11 or Wayland dependency is introduced.
+
+EDID bytes are copied as supplied by the operating system, including extensions, and remain valid until snapshot release. No checksum or descriptor decoding is performed. Hardware identification derived from EDID contents belongs outside this acquisition interface. Native handles are borrowed numeric identities at the time of enumeration, not acquired resources. Refresh the snapshot after display reconfiguration or hotplug; a handle may be invalidated or reused. Never close a native handle obtained here.
+
+## Summary
+
+| Type or macro | Meaning |
+| --- | --- |
+| [CATDVLIB_API](#catdvlib_api) | Native export/import annotation. |
+| [CATDVLIB_DEVICE](#catdvlib_device-and-catdvlib_devices) | Borrowed device record. |
+| [CATDVLIB_DEVICES](#catdvlib_device-and-catdvlib_devices) | Owned snapshot. |
+| [CATDVLIB_IDENTIFIER](#catdvlib_identifier) | Scheme-qualified identifier. |
+| [CATDVLIB_DEVICE_TYPE](#catdvlib_device_type) | Physical/logical classification. |
+
+| Function | Behavior |
+| --- | --- |
+| [catdv_devices_enumerate](#catdv_devices_enumerate) | Acquire a device snapshot. |
+| [catdv_devices_free](#catdv_devices_free) | Release a snapshot. |
+| [catdv_devices_get_count](#catdv_devices_get_count) | Count entries. |
+| [catdv_devices_get](#catdv_devices_get) | Borrow an indexed entry. |
+| [catdv_device_get_type](#catdv_device_get_type) | Retrieve device classification. |
+| [catdv_device_get_identifier](#catdv_device_get_identifier) | Borrow an instance identifier. |
+| [catdv_device_get_hwid_count](#catdv_device_get_hwid_count) | Count available HWIDs. |
+| [catdv_device_get_hwid](#catdv_device_get_hwid) | Borrow an indexed HWID. |
+| [catdv_device_get_serial](#catdv_device_get_serial) | Borrow the serial number. |
+| [catdv_device_get_manufacturer](#catdv_device_get_manufacturer) | Borrow the manufacturer name. |
+| [catdv_device_get_product](#catdv_device_get_product) | Borrow the product name. |
+| [catdv_device_get_descriptor](#catdv_device_get_descriptor) | Borrow the descriptor. |
+| [catdv_device_get_revision](#catdv_device_get_revision) | Borrow the revision. |
+| [catdv_device_has_input](#catdv_device_has_input) | Query native input capability. |
+| [catdv_device_has_output](#catdv_device_has_output) | Query native output capability. |
+| [catdv_device_is_display](#catdv_device_is_display) | Identify a display endpoint. |
+| [catdv_display_get_edid](#catdv_display_get_edid) | Borrow original EDID bytes. |
+| [catdv_display_get_native_handle](#catdv_display_get_native_handle) | Retrieve a native display identity. |
+| [catdv_devices_find_identifier](#catdv_devices_find_identifier) | Find an exact instance identifier. |
+| [catdv_devices_find_native_display](#catdv_devices_find_native_display) | Resolve a native display identity. |
+
+## Macros
+
+### CATDVLIB_API
+
+Export/import annotation for the C ABI. On Windows, `CATDVLIB_EXPORTS` selects `__declspec(dllexport)` and `CATDVLIB_USE_DLL` selects `__declspec(dllimport)`; otherwise the annotation is empty.
 
 ## Types and constants
+
+### CATDVLIB_DEVICE and CATDVLIB_DEVICES
+
+Opaque device and snapshot representations. A device is borrowed from its owning snapshot; release the snapshot with `catdv_devices_free`.
 
 ```c
 typedef struct CATDVLIB_DEVICE CATDVLIB_DEVICE;
 typedef struct CATDVLIB_DEVICES CATDVLIB_DEVICES;
+```
 
-/** An identifier in a named identification scheme; strings are borrowed. */
+### CATDVLIB_IDENTIFIER
+
+A scheme-qualified native identity; neither field alone is a globally unique identifier.
+
+```c
 typedef struct CATDVLIB_IDENTIFIER {
     CATALYST_ASCII scheme;
     CATALYST_UTF8 value;
 } CATDVLIB_IDENTIFIER;
+```
 
+**Fields:**  
+`scheme` — Null-terminated ASCII scheme name.  
+`value` — Null-terminated UTF-8 identifier value.
+
+Returned strings are borrowed. For lookup, both strings must be valid and terminated.
+
+### CATDVLIB_DEVICE_TYPE
+
+Byte-valued classification of the native device record.
+
+```c
 typedef CATALYST_BYTE CATDVLIB_DEVICE_TYPE;
 #define CATDVLIB_DEVICE_UNKNOWN  0x00
 #define CATDVLIB_DEVICE_PHYSICAL 0x01
 #define CATDVLIB_DEVICE_LOGICAL  0x02
 ```
+
+| Constant | Meaning |
+| --- | --- |
+| `CATDVLIB_DEVICE_UNKNOWN` | No physical/logical classification established. |
+| `CATDVLIB_DEVICE_PHYSICAL` | Physical device record. |
+| `CATDVLIB_DEVICE_LOGICAL` | Logical device or interface record. |
+
+The C++ wrappers use the same C ABI representations and forward to the C functions.
 
 ## Functions
 
@@ -48,7 +130,7 @@ CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices);
 ```
 
 **Parameters:**  
-`devices` — Valid resource or writable output slot as described above.
+`devices` — Writable output slot; receives the owned snapshot on success, null on failure.
 
 **Context:** `0x01`
 
@@ -73,7 +155,7 @@ CATALYST_RESULT catdv_devices_free(CATDVLIB_DEVICES* devices);
 ```
 
 **Parameters:**  
-`devices` — Valid resource or writable output slot as described above.
+`devices` — Live owned snapshot. After a partial cleanup failure retry release; no borrowed entry or data may be used.
 
 **Context:** `0x02`
 
@@ -82,8 +164,9 @@ CATALYST_RESULT catdv_devices_free(CATDVLIB_DEVICES* devices);
 | Result | Status | Operation | Detail |
 | --- | --- | --- | --- |
 | `0xSS0201DD` | Propagated native/dependency status | 0x01 | Dependency detail |
-| `0xSS0202DD` | Propagated native/dependency status | 0x02 | Dependency detail |
-| `0x00020300` | SUCCESS | 0x03 | — |
+| `0xSS0202DD` | Snapshot allocation release status (including SUCCESS on Windows/Darwin) | Release snapshot | Dependency detail |
+| `0x00020300` | SUCCESS | Linux snapshot released | — |
+| `0xSS0204DD` | Dependency failure | Release owned EDID bytes | Dependency detail |
 | `0x8502F000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
 ### catdv_devices_get_count
@@ -136,7 +219,7 @@ CATALYST_RESULT catdv_device_get_identifier(const CATDVLIB_DEVICE* device, CATDV
 
 **Parameters:**  
 `device` — Borrowed live resource.  
-`identifier` — Valid resource or writable output slot as described above.
+`identifier` — Writable identifier output; both fields zero on failure.
 
 **Context:** `0x06`
 
@@ -144,7 +227,9 @@ CATALYST_RESULT catdv_device_get_identifier(const CATDVLIB_DEVICE* device, CATDV
 
 | Result | Status | Operation | Detail |
 | --- | --- | --- | --- |
-| `0x00060100` | SUCCESS | 0x01 | — |
+| `0x00060100` | SUCCESS | Linux instance path | — |
+| `0xSS060100` | Stored native failure status | Windows/Darwin identifier unavailable | — |
+| `0x00060200` | SUCCESS | Windows/Darwin instance identity | — |
 | `0x8506F000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
 ### catdv_device_get_hwid_count
@@ -157,7 +242,7 @@ CATALYST_RESULT catdv_device_get_hwid_count(const CATDVLIB_DEVICE* device, CATAL
 
 **Parameters:**  
 `device` — Borrowed live resource.  
-`count` — Valid resource or writable output slot as described above.
+`count` — Writable count output; zero on failure.
 
 **Context:** `0x07`
 
@@ -181,7 +266,7 @@ CATALYST_RESULT catdv_device_get_hwid(const CATDVLIB_DEVICE* device, CATALYST_NU
 **Parameters:**  
 `device` — Borrowed live resource.  
 `index` — Valid index in the reported collection.  
-`hwid` — Valid resource or writable output slot as described above.
+`hwid` — Writable borrowed identifier output; zero fields on failure.
 
 **Context:** `0x08`
 
@@ -203,7 +288,7 @@ CATALYST_RESULT catdv_device_get_serial(const CATDVLIB_DEVICE* device, CATALYST_
 
 **Parameters:**  
 `device` — Borrowed live resource.  
-`serial` — Valid resource or writable output slot as described above.
+`serial` — Writable borrowed UTF-8 pointer output; null on failure.
 
 **Context:** `0x09`
 
@@ -225,7 +310,7 @@ CATALYST_RESULT catdv_device_get_manufacturer(const CATDVLIB_DEVICE* device, CAT
 
 **Parameters:**  
 `device` — Borrowed live resource.  
-`manufacturer` — Valid resource or writable output slot as described above.
+`manufacturer` — Writable borrowed UTF-8 pointer output; null on failure.
 
 **Context:** `0x0A`
 
@@ -247,7 +332,7 @@ CATALYST_RESULT catdv_device_get_product(const CATDVLIB_DEVICE* device, CATALYST
 
 **Parameters:**  
 `device` — Borrowed live resource.  
-`product` — Valid resource or writable output slot as described above.
+`product` — Writable borrowed UTF-8 pointer output; null on failure.
 
 **Context:** `0x0B`
 
@@ -269,7 +354,7 @@ CATALYST_RESULT catdv_device_get_descriptor(const CATDVLIB_DEVICE* device, CATAL
 
 **Parameters:**  
 `device` — Borrowed live resource.  
-`descriptor` — Valid resource or writable output slot as described above.
+`descriptor` — Writable borrowed UTF-8 pointer output; null on failure.
 
 **Context:** `0x0C`
 
@@ -291,7 +376,7 @@ CATALYST_RESULT catdv_device_get_revision(const CATDVLIB_DEVICE* device, CATALYS
 
 **Parameters:**  
 `device` — Borrowed live resource.  
-`revision` — Valid resource or writable output slot as described above.
+`revision` — Writable borrowed UTF-8 pointer output; null on failure.
 
 **Context:** `0x0D`
 
@@ -313,7 +398,7 @@ CATALYST_RESULT catdv_device_has_input(const CATDVLIB_DEVICE* device, CATALYST_B
 
 **Parameters:**  
 `device` — Borrowed live resource.  
-`supported` — Valid resource or writable output slot as described above.
+`supported` — Writable Boolean output; false on failure.
 
 **Context:** `0x0E`
 
@@ -336,7 +421,7 @@ CATALYST_RESULT catdv_device_has_output(const CATDVLIB_DEVICE* device, CATALYST_
 
 **Parameters:**  
 `device` — Borrowed live resource.  
-`supported` — Valid resource or writable output slot as described above.
+`supported` — Writable Boolean output; false on failure.
 
 **Context:** `0x0F`
 
@@ -349,24 +434,16 @@ CATALYST_RESULT catdv_device_has_output(const CATDVLIB_DEVICE* device, CATALYST_
 | `0x000F0300` | SUCCESS | 0x03 | — |
 | `0x850FF000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
-
-## Display identification and native interoperability
-
-Display endpoints are included in the same device snapshot. They are logical system records, not an assertion that each record is a distinct physical panel. They expose output capability without opening an output communication resource. No geometry, modes, rendering, windowing, EDID interpretation, DDC/CI, or private SDK APIs are included.
-
-- Windows: active monitor interfaces associated with Win32 monitor handles. `windows-monitor` identifies the exact monitor interface path; `windows-display-source` is used when no active monitor interface is exposed. SetupAPI opens the corresponding device registry key and reads its binary EDID value. Several monitor endpoints may share one HMONITOR (for example, cloned displays).
-- Darwin: online CGDirectDisplayID values identify `darwin-display` entries (eight uppercase hexadecimal digits). The model identifier uses the `darwin-display-model` scheme, with eight-digit vendor and product fields separated by a colon. A nonzero numeric CoreGraphics serial is exposed in hexadecimal. EDID comes from public IOKit IODisplayConnect dictionaries only when a single native association can be established; matching uses vendor, product and available serial values. Duplicate/ambiguous associations are reported rather than guessed. On Apple Silicon, including built-in panels, the public legacy property may be unavailable. No synthetic EDID or private AVService access is used.
-- Linux: connected DRM connectors are exposed as `linux-sysfs` canonical instance paths. The binary EDID attribute is read to EOF, with a 32768-byte bound; larger values report overflow. There is no single process-independent numeric X11/Wayland/DRM display handle. Use exact canonical connector identifiers for lookup. No libdrm, X11 or Wayland dependency is introduced.
-
-EDID bytes are copied as supplied by the operating system, including extensions, and remain valid until snapshot release. No checksum or descriptor decoding is performed. Hardware identification derived from EDID contents belongs outside this acquisition interface. Native handles are borrowed numeric identities at the time of enumeration, not acquired resources. Refresh the snapshot after display reconfiguration or hotplug; a handle may be invalidated or reused. Never close a native handle obtained here.
-
 ### catdv_device_is_display
 
 ```c
 CATALYST_BOOL catdv_device_is_display(const CATDVLIB_DEVICE* device);
 ```
 
-Returns whether a valid borrowed snapshot entry is a display endpoint.
+**Parameters:**  
+`device` — Valid borrowed device entry.
+
+**Returns:** True if the entry represents a native display endpoint; false otherwise.
 
 ### catdv_display_get_edid
 
@@ -381,12 +458,14 @@ CATALYST_RESULT catdv_display_get_edid(const CATDVLIB_DEVICE* device, const CATA
 
 **Context:** `0x10`
 
+**Results:**
+
 | Result | Status | Operation | Detail |
 | --- | --- | --- | --- |
-| 0x86100100 | System not supported | Not a display | — |
-| 0xSS100200 | Native acquisition status | EDID unavailable, ambiguous, or acquisition failed | — |
-| 0x00100300 | Success | Borrow EDID bytes and extent | — |
-| 0x8510F000 | Not implemented | Target fallback | — |
+| `0x86100100` | System not supported | Not a display | — |
+| `0xSS100200` | Native acquisition status | EDID unavailable, ambiguous, or acquisition failed | — |
+| `0x00100300` | Success | Borrow EDID bytes and extent | — |
+| `0x8510F000` | Not implemented | Target fallback | — |
 
 ### catdv_display_get_native_handle
 
@@ -400,12 +479,14 @@ CATALYST_RESULT catdv_display_get_native_handle(const CATDVLIB_DEVICE* device, C
 
 **Context:** `0x11`
 
+**Results:**
+
 | Result | Status | Operation | Detail |
 | --- | --- | --- | --- |
-| 0x86110100 | System not supported | Not a display | — |
-| 0x85110200 | Not implemented | No numeric native display identity | — |
-| 0x00110300 | Success | Return borrowed native identity | — |
-| 0x8511F000 | Not implemented | Target fallback | — |
+| `0x86110100` | System not supported | Not a display | — |
+| `0x85110200` | Not implemented | No numeric native display identity | — |
+| `0x00110300` | Success | Return borrowed native identity | — |
+| `0x8511F000` | Not implemented | Target fallback | — |
 
 ### catdv_devices_find_identifier
 
@@ -420,12 +501,14 @@ CATALYST_RESULT catdv_devices_find_identifier(const CATDVLIB_DEVICES* devices, c
 
 **Context:** `0x12`
 
+**Results:**
+
 | Result | Status | Operation | Detail |
 | --- | --- | --- | --- |
-| 0xSS1201DD | Dependency status | Instance retrieval failed | Dependency detail |
-| 0x82120200 | Invalid state | Multiple matching entries | — |
-| 0x88120300 | Not found | No matching entry | — |
-| 0x00120400 | Success | Return unique matching entry | — |
+| `0xSS1201DD` | Dependency status | Instance retrieval failed | Dependency detail |
+| `0x82120200` | Invalid state | Multiple matching entries | — |
+| `0x88120300` | Not found | No matching entry | — |
+| `0x00120400` | Success | Return unique matching entry | — |
 
 ### catdv_devices_find_native_display
 
@@ -440,10 +523,12 @@ CATALYST_RESULT catdv_devices_find_native_display(const CATDVLIB_DEVICES* device
 
 **Context:** `0x13`
 
+**Results:**
+
 | Result | Status | Operation | Detail |
 | --- | --- | --- | --- |
-| 0xSS1301DD | Dependency status | Native identity retrieval failed | Dependency detail |
-| 0x82130200 | Invalid state | Multiple matching endpoints | — |
-| 0x88130300 | Not found | No matching numeric handle | — |
-| 0x00130400 | Success | Return unique matching display | — |
-| 0x85130500 | Not implemented | No supported numeric display handle on this target | — |
+| `0xSS1301DD` | Dependency status | Native identity retrieval failed | Dependency detail |
+| `0x82130200` | Invalid state | Multiple matching endpoints | — |
+| `0x88130300` | Not found | No matching numeric handle | — |
+| `0x00130400` | Success | Return unique matching display | — |
+| `0x85130500` | Not implemented | No supported numeric display handle on this target | — |
