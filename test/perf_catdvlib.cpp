@@ -42,6 +42,25 @@ static PerfOutcome query(void* fixture, bool cpp) {
     if (value) digest = (catalyst::BYTE) (digest ^ value[0]);
     return PerfOutcome(r, digest);
 }
+struct LookupFixture {
+    const CATDVLIB_DEVICES* snapshot;
+    CATDVLIB_IDENTIFIER identifier;
+    catalyst::NUINT native;
+    bool byHandle;
+};
+static PerfOutcome lookup(void* fixture, bool cpp) {
+    LookupFixture* f = (LookupFixture*) fixture;
+    const CATDVLIB_DEVICE* device = 0;
+    catalyst::RESULT r;
+    if (f->byHandle)
+        r = cpp ? catalyst::device::devices_find_native_display(f->snapshot, f->native, &device) :
+            catalyst::RESULT(catdv_devices_find_native_display(f->snapshot, f->native, &device));
+    else
+        r = cpp ? catalyst::device::devices_find_identifier(f->snapshot, &f->identifier, &device) :
+            catalyst::RESULT(catdv_devices_find_identifier(f->snapshot, &f->identifier, &device));
+    return PerfOutcome(r, device ? 1 : 0);
+}
+
 int main() {
     std::printf("CATDVLIB Performance (Release recommended)\nTarget: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
     std::printf("Median of three CPU-time samples. Enumeration includes allocation and release; other queries use a cached snapshot.\n");
@@ -71,6 +90,28 @@ int main() {
             found = true; break;
         }
         if (!found) { std::printf("\n%s: unavailable\n", labels[field - 0x06]); ++unavailable; }
+    }
+    for (catalyst::BYTE mode = 0; mode < 2; ++mode) {
+        bool found = false;
+        const char* label = mode ? "native display lookup" : "instance identifier lookup";
+        for (catalyst::NUINT j = 0; j < count; ++j) {
+            const CATDVLIB_DEVICE* entry = catdv_devices_get(snapshot, j);
+            LookupFixture f = { snapshot, {0, 0}, 0, mode != 0 };
+            if (mode) {
+                if (!catdv_device_is_display(entry) ||
+                    catdv_display_get_native_handle(entry, &f.native).status != catalyst::STATUS_CODE_SUCCESS) continue;
+            } else if (catdv_device_get_identifier(entry, &f.identifier).status != catalyst::STATUS_CODE_SUCCESS) continue;
+            const CATDVLIB_DEVICE* match = 0;
+            catalyst::RESULT preflight = mode ?
+                catalyst::RESULT(catdv_devices_find_native_display(snapshot, f.native, &match)) :
+                catalyst::RESULT(catdv_devices_find_identifier(snapshot, &f.identifier, &match));
+            if (preflight.status != catalyst::STATUS_CODE_SUCCESS) continue;
+            if (match != entry) { ++failed; continue; }
+            print_device(j, entry);
+            perf_record(benchmark_io(label, lookup, &f, mode ? 0x13 : 0x12, 1048576UL), &failed, &unavailable);
+            found = true; break;
+        }
+        if (!found) { std::printf("\n%s: unavailable\n", label); ++unavailable; }
     }
     r = catdv_devices_free(snapshot);
     if (r.status != catalyst::STATUS_CODE_SUCCESS) ++failed;

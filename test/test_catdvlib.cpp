@@ -1,4 +1,14 @@
 #include "device_test.hpp"
+#if TARGET_PLATFORM_DARWIN
+#include <CoreGraphics/CoreGraphics.h>
+#elif TARGET_PLATFORM_WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+#undef TRUE
+#undef FALSE
 
 typedef CATALYST_RESULT (*TextQuery)(const CATDVLIB_DEVICE*, CATALYST_UTF8*);
 typedef catalyst::RESULT (*TextQueryCpp)(const CATDVLIB_DEVICE*, catalyst::UTF8*);
@@ -112,6 +122,38 @@ int main(int argc, char** argv) {
         }
         report.summary(before);
     }
+    // Obtain an identity from the native system, independently of Catalyst.
+#if TARGET_PLATFORM_WIN32 || TARGET_PLATFORM_DARWIN
+    catalyst::NUINT nativePrimary = 0;
+#if TARGET_PLATFORM_DARWIN
+    nativePrimary = (catalyst::NUINT) CGMainDisplayID();
+#elif TARGET_PLATFORM_WIN32
+    POINT origin = { 0, 0 };
+    nativePrimary = (catalyst::NUINT) MonitorFromPoint(origin, MONITOR_DEFAULTTOPRIMARY);
+#endif
+    if (nativePrimary) {
+        const CATDVLIB_DEVICE* primary = 0;
+        catalyst::RESULT pr = catdv_devices_find_native_display(snapshot, nativePrimary, &primary);
+        if (pr.status == catalyst::STATUS_CODE_ERROR_INVALID_STATE) {
+            report.check(!primary && pr.context == 0x13 && pr.operation == 0x02 && !pr.detail, "ambiguous native primary result");
+            report.skip("native primary display maps to several endpoints");
+        } else {
+            report.check(pr.status == catalyst::STATUS_CODE_SUCCESS && pr.context == 0x13 &&
+                pr.operation == 0x04 && !pr.detail && primary && catdv_device_is_display(primary), "independent native primary display lookup");
+            if (primary) {
+                catalyst::NUINT roundTrip = 0;
+                catalyst::RESULT hr = catdv_display_get_native_handle(primary, &roundTrip);
+                report.check(hr.status == catalyst::STATUS_CODE_SUCCESS && roundTrip == nativePrimary, "native primary handle identity");
+                std::printf("Native primary display resolved successfully.\n");
+            }
+        }
+    } else report.skip("no native primary display");
+#else
+    const CATDVLIB_DEVICE* unsupported = 0;
+    catalyst::RESULT nr = catdv_devices_find_native_display(snapshot, 0, &unsupported);
+    report.check(nr.status == catalyst::STATUS_CODE_ERROR_NOT_IMPLEMENTED && nr.context == 0x13 &&
+        nr.operation == 0x05 && !nr.detail && !unsupported, "unsupported numeric native display lookup");
+#endif
     CATDVLIB_IDENTIFIER absent = { (CATALYST_ASCII) "test-absent-scheme", (CATALYST_UTF8) "absent" };
     const CATDVLIB_DEVICE* missing = 0;
     catalyst::RESULT notFound = catdv_devices_find_identifier(snapshot, &absent, &missing);
