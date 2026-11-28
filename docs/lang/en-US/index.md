@@ -26,10 +26,10 @@
 
 Aether implements Layer 1: System of the CatalystUI model. It exposes native system facilities through portable C contracts built upon [FDEFSPEC](https://catalystui.org/specifications/languages/fdefspec/) and Core's foundational representations.
 
-Aether exposes capabilities that are system-specific or not available on every Catalyst-compatible system. It preserves native availability and does not emulate unsupported facilities. Windowing belongs to Crystal.
+Aether exposes capabilities that are system-specific or not available on every Catalyst-compatible system. It preserves native availability and does not emulate unsupported facilities. Windowing belongs to Crystal. Aether identifies system and device facilities; discovery does not implement general-purpose device communication, event processing or report submission.
 
 > [!NOTE]
-> Aether is in early development (1.0.0-alpha.1). Native system identification is implemented for Windows, macOS, and Linux. API and ABI stability are not yet guaranteed.
+> Aether is in early development (1.0.0-alpha.1). Native system identification and initial device discovery are implemented for Windows, macOS, and Linux; discovery coverage varies by platform. API and ABI stability are not yet guaranteed.
 
 ## Libraries
 
@@ -41,6 +41,13 @@ Aether exposes capabilities that are system-specific or not available on every C
 
 <p style="margin:0 0 0.85rem;max-width:20rem;">Identify the operating system, distribution, architecture, and hostname.</p>
 <small style="opacity:0.8;margin-top:auto;">Link: <code>catsy</code></small>
+</div>
+<div style="flex:1 1 calc(50% - 0.5rem);min-width:min(100%, 15rem);box-sizing:border-box;padding:1.2rem;border:1px solid color-mix(in srgb, currentColor 19%, transparent);border-radius:12px;background:color-mix(in srgb, currentColor 3%, transparent);display:flex;flex-direction:column;align-items:center;text-align:center;">
+
+**[CATDVLIB](api-reference/catdvlib/index.md)**
+
+<p style="margin:0 0 0.85rem;max-width:20rem;">Discover native devices, hardware and instance identifiers, metadata, and available capabilities.</p>
+<small style="opacity:0.8;margin-top:auto;">Link: <code>catdv</code></small>
 </div>
 </div>
 
@@ -83,7 +90,7 @@ cmake --preset aclang17-darwin24.6-arm64 -DCATALYST_AETHER_USE_INSTALLED_CORE=ON
 
 Use a compatible target, build configuration, and toolchain. Existing parent-provided Core targets take precedence. Static Aether libraries link to static Core libraries; shared Aether libraries link to shared Core libraries. For distribution, deploy the required shared Core runtime files and ABI aliases alongside Aether's runtime files.
 
-Aether exposes `Catalyst::catsy_static` and `Catalyst::catsy_shared` to CMake source consumers. Its standalone verification programs are enabled by default only for top-level builds.
+Aether exposes `Catalyst::catsy_static`, `Catalyst::catsy_shared`, `Catalyst::catdv_static`, and `Catalyst::catdv_shared` to CMake source consumers. Its standalone verification programs are enabled by default only for top-level builds.
 
 ## Verification
 

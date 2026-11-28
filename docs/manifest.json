@@ -26,16 +26,6 @@
                     "title": "CATDVLIB",
                     "path": "/api-reference/catdvlib",
                     "alignment": "block"
-                },
-                {
-                    "title": "CATINLIB",
-                    "path": "/api-reference/catinlib",
-                    "alignment": "block"
-                },
-                {
-                    "title": "CATOTLIB",
-                    "path": "/api-reference/catotlib",
-                    "alignment": "block"
                 }
             ]
         }

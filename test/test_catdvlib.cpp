@@ -1,4 +1,4 @@
-#include "device_io_test.hpp"
+#include "device_test.hpp"
 
 typedef CATALYST_RESULT (*TextQuery)(const CATDVLIB_DEVICE*, CATALYST_UTF8*);
 typedef catalyst::RESULT (*TextQueryCpp)(const CATDVLIB_DEVICE*, catalyst::UTF8*);

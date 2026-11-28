@@ -1,4 +1,4 @@
-#include "device_io_native.hpp"
+#include "device_native.hpp"
 
 struct DeviceFixture { const CATDVLIB_DEVICE* device; catalyst::NUINT index; catalyst::BYTE field; };
 static PerfOutcome enumerate(void*, bool cpp) {

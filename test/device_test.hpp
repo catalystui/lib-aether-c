@@ -1,5 +1,5 @@
-#ifndef DEVICE_IO_TEST_HPP
-#define DEVICE_IO_TEST_HPP
+#ifndef DEVICE_TEST_HPP
+#define DEVICE_TEST_HPP
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -71,60 +71,6 @@ static inline void print_device(catalyst::NUINT index, const CATDVLIB_DEVICE* d)
         std::printf(" — %s%s%s", manufacturer ? (const char*) manufacturer : "",
             manufacturer && product ? " / " : "", product ? (const char*) product : "");
     std::printf("\n");
-}
-
-/* Device indices are snapshot-local. No implicit write target. */
-static inline bool parse_index(const char* text, catalyst::NUINT* index) {
-    if (!*text) return false;
-    catalyst::NUINT n = 0;
-    while (*text) {
-        if (*text < '0' || *text > '9') return false;
-        catalyst::BYTE digit = (catalyst::BYTE) (*text++ - '0');
-        if (n > (CATALYST_NUINT_MAX - digit) / 10) return false;
-        n = (catalyst::NUINT) (n * 10 + digit);
-    }
-    *index = n;
-    return true;
-}
-
-/* Select from the same retained snapshot that will be used for opening.
- * The menu lists only the requested direction. No device is chosen implicitly. */
-static inline const CATDVLIB_DEVICE* select_device(const CATDVLIB_DEVICES* snapshot,
-                                                  bool input, const char* scheme, const char* instance) {
-    catalyst::NUINT count = catdv_devices_get_count(snapshot);
-    bool any = false;
-    for (catalyst::NUINT j = 0; j < count; ++j) {
-        const CATDVLIB_DEVICE* d = catdv_devices_get(snapshot, j);
-        catalyst::BOOL supported = catalyst::FALSE;
-        catalyst::RESULT r = input ? catdv_device_has_input(d, &supported) : catdv_device_has_output(d, &supported);
-        if (r.status != catalyst::STATUS_CODE_SUCCESS || !supported) continue;
-        any = true;
-        if (scheme) {
-            CATDVLIB_IDENTIFIER id = {0, 0};
-            if (catdv_device_get_identifier(d, &id).status == catalyst::STATUS_CODE_SUCCESS &&
-                valid_identifier(id) && !std::strcmp((const char*) id.scheme, scheme) &&
-                !std::strcmp((const char*) id.value, instance)) return d;
-        } else print_device(j, d);
-    }
-    if (scheme) {
-        std::printf("No matching %s instance. Omit the scheme and ID to select from a menu.\n", input ? "input" : "output");
-        return 0;
-    }
-    if (!any) { std::printf("No discovered %s devices.\n", input ? "input" : "output"); return 0; }
-    std::printf("\nSelect a device index (or Enter to cancel): ");
-    std::fflush(stdout);
-    char line[64];
-    if (!std::fgets(line, sizeof(line), stdin)) return 0;
-    char* end = std::strchr(line, '\n');
-    if (!end) return 0;
-    *end = 0;
-    if (end != line && end[-1] == '\r') end[-1] = 0;
-    catalyst::NUINT index;
-    if (!parse_index(line, &index) || index >= count) return 0;
-    const CATDVLIB_DEVICE* d = catdv_devices_get(snapshot, index);
-    catalyst::BOOL supported = catalyst::FALSE;
-    catalyst::RESULT r = input ? catdv_device_has_input(d, &supported) : catdv_device_has_output(d, &supported);
-    return r.status == catalyst::STATUS_CODE_SUCCESS && supported ? d : 0;
 }
 
 static inline bool take_verbose(int* argc, char*** argv) {

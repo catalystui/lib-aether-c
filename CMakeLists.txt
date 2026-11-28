@@ -86,58 +86,48 @@ if(CORE_IMPORTED AND (TARGET_PLATFORM_LINUX OR TARGET_PLATFORM_DARWIN))
     )
 endif()
 
-# Native device and I/O modules consume the same Core targets as CATSYLIB.
-foreach(MODULE catdv catin catot)
-    set(MODULE_NAME "${MODULE}lib")
-    if(TARGET_PLATFORM_LINUX)
-        set(MODULE_SOURCE "src/${MODULE_NAME}.linux.cpp")
-    elseif(TARGET_PLATFORM_WIN32)
-        set(MODULE_SOURCE "src/${MODULE_NAME}.win32.cpp")
+# Native device discovery consumes the same Core targets as CATSYLIB.
+if(TARGET_PLATFORM_LINUX)
+    set(MODULE_SOURCE "src/catdvlib.linux.cpp")
+elseif(TARGET_PLATFORM_WIN32)
+    set(MODULE_SOURCE "src/catdvlib.win32.cpp")
+elseif(TARGET_PLATFORM_DARWIN)
+    set(MODULE_SOURCE "src/catdvlib.darwin.cpp")
+else()
+    set(MODULE_SOURCE "src/catdvlib.cpp")
+endif()
+if(TARGET_PLATFORM_WIN32 OR TARGET_PLATFORM_DARWIN)
+    list(APPEND MODULE_SOURCE src/catdvlib.native.cpp)
+endif()
+add_library(catdvlib_shared SHARED)
+add_library(catdvlib_static STATIC)
+configure_target(
+    NAME catdv
+    TARGETS catdvlib_shared catdvlib_static
+    SOURCES ${MODULE_SOURCE}
+)
+target_compile_definitions(catdvlib_shared PRIVATE CATDVLIB_EXPORTS INTERFACE CATDVLIB_USE_DLL)
+foreach(KIND shared static)
+    set(TARGET_NAME "catdvlib_${KIND}")
+    target_include_directories(${TARGET_NAME} PUBLIC "${PROJECT_SOURCE_DIR}/include")
+    target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+    target_link_libraries(${TARGET_NAME} PUBLIC Catalyst::catalyst)
+    if(TARGET_PLATFORM_LINUX OR TARGET_PLATFORM_WIN32 OR TARGET_PLATFORM_DARWIN)
+        target_link_libraries(${TARGET_NAME} PRIVATE Catalyst::catmm_${KIND} Catalyst::catte_${KIND})
+    endif()
+    if(TARGET_PLATFORM_WIN32)
+        target_link_libraries(${TARGET_NAME} PRIVATE hid setupapi)
     elseif(TARGET_PLATFORM_DARWIN)
-        set(MODULE_SOURCE "src/${MODULE_NAME}.darwin.cpp")
-    else()
-        set(MODULE_SOURCE "src/${MODULE_NAME}.cpp")
+        target_link_libraries(${TARGET_NAME} PRIVATE "-framework IOKit" "-framework CoreFoundation")
     endif()
-    if(MODULE STREQUAL "catdv" AND (TARGET_PLATFORM_WIN32 OR TARGET_PLATFORM_DARWIN))
-        list(APPEND MODULE_SOURCE src/catdvlib.native.cpp)
-    endif()
-    add_library(${MODULE_NAME}_shared SHARED)
-    add_library(${MODULE_NAME}_static STATIC)
-    configure_target(
-        NAME ${MODULE}
-        TARGETS ${MODULE_NAME}_shared ${MODULE_NAME}_static
-        SOURCES ${MODULE_SOURCE}
-    )
-    string(TOUPPER "${MODULE_NAME}" MODULE_UPPER)
-    target_compile_definitions(${MODULE_NAME}_shared PRIVATE ${MODULE_UPPER}_EXPORTS INTERFACE ${MODULE_UPPER}_USE_DLL)
-    foreach(KIND shared static)
-        set(TARGET_NAME "${MODULE_NAME}_${KIND}")
-        target_include_directories(${TARGET_NAME} PUBLIC "${PROJECT_SOURCE_DIR}/include")
-        target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
-        target_link_libraries(${TARGET_NAME} PUBLIC Catalyst::catalyst)
-        if(TARGET_PLATFORM_LINUX OR TARGET_PLATFORM_WIN32 OR TARGET_PLATFORM_DARWIN)
-            target_link_libraries(${TARGET_NAME} PRIVATE Catalyst::catmm_${KIND} Catalyst::catte_${KIND})
-        endif()
-        if(TARGET_PLATFORM_WIN32)
-            target_link_libraries(${TARGET_NAME} PRIVATE hid)
-            if(MODULE STREQUAL "catdv")
-                target_link_libraries(${TARGET_NAME} PRIVATE setupapi)
-            endif()
-        elseif(TARGET_PLATFORM_DARWIN)
-            target_link_libraries(${TARGET_NAME} PRIVATE "-framework IOKit" "-framework CoreFoundation")
-        endif()
-        if(NOT MODULE STREQUAL "catdv")
-            target_link_libraries(${TARGET_NAME} PUBLIC Catalyst::catdv_${KIND})
-        endif()
-        add_library(Catalyst::${MODULE}_${KIND} ALIAS ${TARGET_NAME})
-    endforeach()
-    if(CORE_IMPORTED AND (TARGET_PLATFORM_LINUX OR TARGET_PLATFORM_DARWIN))
-        set_target_properties(${MODULE_NAME}_shared PROPERTIES
-            BUILD_WITH_INSTALL_RPATH FALSE
-            BUILD_RPATH_USE_ORIGIN TRUE
-        )
-    endif()
+    add_library(Catalyst::catdv_${KIND} ALIAS ${TARGET_NAME})
 endforeach()
+if(CORE_IMPORTED AND (TARGET_PLATFORM_LINUX OR TARGET_PLATFORM_DARWIN))
+    set_target_properties(catdvlib_shared PROPERTIES
+        BUILD_WITH_INSTALL_RPATH FALSE
+        BUILD_RPATH_USE_ORIGIN TRUE
+    )
+endif()
 
 # Define standalone verification and performance executables.
 if(CATALYST_AETHER_BUILD_TESTS)
@@ -147,8 +137,6 @@ if(CATALYST_AETHER_BUILD_TESTS)
         SHARED_DEPENDS
             catsylib_shared
     )
-    foreach(MODULE catdv catin catot)
-        target_link_libraries(test_${MODULE}lib PRIVATE Catalyst::${MODULE}_static)
-        target_link_libraries(perf_${MODULE}lib PRIVATE Catalyst::${MODULE}_static)
-    endforeach()
+    target_link_libraries(test_catdvlib PRIVATE Catalyst::catdv_static)
+    target_link_libraries(perf_catdvlib PRIVATE Catalyst::catdv_static)
 endif()

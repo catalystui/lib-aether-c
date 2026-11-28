@@ -1,5 +1,5 @@
 #include "catdvlib.h"
-#include "catio.linux.hpp"
+#include "catdvlib.linux.hpp"
 #include "cattelib.h"
 #include <dirent.h>
 
@@ -28,18 +28,18 @@ struct CATDVLIB_DEVICES {
 static void catdv_attribute(const char* root, const char* name, CATDVLIB_TEXT* field) {
     char path[PATH_MAX];
     field->text[0] = 0;
-    if (!catio_join(path, sizeof(path), root, name)) { field->status = catalyst::STATUS_CODE_ERROR_BUFFER_OVERFLOW; return; }
+    if (!catdv_join(path, sizeof(path), root, name)) { field->status = catalyst::STATUS_CODE_ERROR_BUFFER_OVERFLOW; return; }
     int fd = open(path, O_RDONLY | O_CLOEXEC);
-    if (fd < 0) { field->status = catio_errno(errno); return; }
+    if (fd < 0) { field->status = catdv_errno(errno); return; }
     catalyst::NUINT used = 0;
     field->status = catalyst::STATUS_CODE_SUCCESS;
     while (used < sizeof(field->text)) {
         ssize_t got = read(fd, field->text + used, sizeof(field->text) - used);
-        if (got < 0) { field->status = catio_errno(errno); break; }
+        if (got < 0) { field->status = catdv_errno(errno); break; }
         if (got == 0) break;
         used += (catalyst::NUINT) got;
     }
-    if (close(fd) != 0 && field->status == catalyst::STATUS_CODE_SUCCESS) field->status = catio_errno(errno);
+    if (close(fd) != 0 && field->status == catalyst::STATUS_CODE_SUCCESS) field->status = catdv_errno(errno);
     if (field->status != catalyst::STATUS_CODE_SUCCESS) return;
     if (used == sizeof(field->text)) { field->status = catalyst::STATUS_CODE_ERROR_BUFFER_OVERFLOW; return; }
     while (used && (field->text[used - 1] == '\n' || field->text[used - 1] == '\r')) --used;
@@ -113,17 +113,17 @@ static void catdv_bus_hwid(CATDVLIB_DEVICE* device, CATALYST_BYTE kind) {
         const char* bid = catdv_hex_id(&bus);
         if (!bid) { device->bus_hwid.status = catalyst::STATUS_CODE_ERROR_MALFORMED_INPUT; return; }
         device->bus_scheme = (CATALYST_ASCII) "linux-input";
-        if (!catio_append(value, capacity, &used, bid) ||
-            !catio_append(value, capacity, &used, ":")) {
+        if (!catdv_append(value, capacity, &used, bid) ||
+            !catdv_append(value, capacity, &used, ":")) {
             device->bus_hwid.status = catalyst::STATUS_CODE_ERROR_BUFFER_OVERFLOW;
             return;
         }
     } else {
         device->bus_scheme = (CATALYST_ASCII) (kind == 0 ? "usb" : "pci");
     }
-    if (!catio_append(value, capacity, &used, vid) ||
-        !catio_append(value, capacity, &used, ":") ||
-        !catio_append(value, capacity, &used, pid)) {
+    if (!catdv_append(value, capacity, &used, vid) ||
+        !catdv_append(value, capacity, &used, ":") ||
+        !catdv_append(value, capacity, &used, pid)) {
         device->bus_hwid.status = catalyst::STATUS_CODE_ERROR_BUFFER_OVERFLOW;
         return;
     }
@@ -137,7 +137,7 @@ static void catdv_fill(CATDVLIB_DEVICE* device, CATALYST_BYTE kind) {
     device->type = kind == 2 ? CATDVLIB_DEVICE_LOGICAL : CATDVLIB_DEVICE_PHYSICAL;
     /* USB interface records are logical; PCI records identify hardware functions. */
     if (kind == 0) {
-        const char* name = catio_basename(device->path);
+        const char* name = catdv_basename(device->path);
         while (*name && *name != ':') ++name;
         if (*name == ':') device->type = CATDVLIB_DEVICE_LOGICAL;
     }
@@ -177,21 +177,21 @@ static CATALYST_RESULT catdv_scan(CATDVLIB_DEVICES* snapshot, const char* root, 
     DIR* dir = opendir(root);
     if (!dir) {
         if (errno == ENOENT) return catalyst::RESULT(catalyst::STATUS_CODE_SUCCESS, 0x80, 1, 0);
-        return catalyst::RESULT(catio_errno(errno), 0x80, 2, 0);
+        return catalyst::RESULT(catdv_errno(errno), 0x80, 2, 0);
     }
     CATALYST_RESULT result = catalyst::RESULT(catalyst::STATUS_CODE_SUCCESS, 0x80, 3, 0);
     for (;;) {
         errno = 0;
         struct dirent* entry = readdir(dir);
         if (!entry) {
-            if (errno) result = catalyst::RESULT(catio_errno(errno), 0x80, 4, 0);
+            if (errno) result = catalyst::RESULT(catdv_errno(errno), 0x80, 4, 0);
             break;
         }
         if (entry->d_name[0] == '.') continue;
-        if (kind == 2 && !catio_event_name(entry->d_name)) continue;
+        if (kind == 2 && !catdv_event_name(entry->d_name)) continue;
         char path[PATH_MAX], resolved[PATH_MAX];
-        if (!catio_join(path, sizeof(path), root, entry->d_name)) { result = catalyst::RESULT(catalyst::STATUS_CODE_ERROR_BUFFER_OVERFLOW, 0x80, 5, 0); break; }
-        catalyst::STATUS_CODE resolved_status = catio_resolve(path, resolved, sizeof(resolved));
+        if (!catdv_join(path, sizeof(path), root, entry->d_name)) { result = catalyst::RESULT(catalyst::STATUS_CODE_ERROR_BUFFER_OVERFLOW, 0x80, 5, 0); break; }
+        catalyst::STATUS_CODE resolved_status = catdv_resolve(path, resolved, sizeof(resolved));
         if (resolved_status != catalyst::STATUS_CODE_SUCCESS) {
             if (resolved_status == catalyst::STATUS_CODE_ERROR_NOT_FOUND) continue;
             result = catalyst::RESULT(resolved_status, 0x80, 6, 0); break;
@@ -204,7 +204,7 @@ static CATALYST_RESULT catdv_scan(CATDVLIB_DEVICES* snapshot, const char* root, 
         }
         CATALYST_BOOL duplicate = CATALYST_FALSE;
         for (CATALYST_NUINT j = 0; j < snapshot->count; ++j)
-            if (catio_native_equal(snapshot->data[j].path, resolved)) { duplicate = CATALYST_TRUE; break; }
+            if (catdv_native_equal(snapshot->data[j].path, resolved)) { duplicate = CATALYST_TRUE; break; }
         if (duplicate) continue;
         if (snapshot->count == snapshot->capacity) {
             const CATALYST_NUINT maximum = ((CATALYST_NUINT) -1) / sizeof(CATDVLIB_DEVICE);
@@ -220,12 +220,12 @@ static CATALYST_RESULT catdv_scan(CATDVLIB_DEVICES* snapshot, const char* root, 
         }
         CATDVLIB_DEVICE* device = &snapshot->data[snapshot->count];
         catmm_fill(device, 0, sizeof(*device));
-        catmm_copy(device->path, resolved, catio_native_extent(resolved) + 1);
+        catmm_copy(device->path, resolved, catdv_native_extent(resolved) + 1);
         catdv_fill(device, kind);
         ++snapshot->count;
     }
     if (closedir(dir) != 0 && CATALYST_STATUS_CODE_IS_SUCCESS(result.status))
-        return catalyst::RESULT(catio_errno(errno), 0x80, 10, 0);
+        return catalyst::RESULT(catdv_errno(errno), 0x80, 10, 0);
     return result;
 }
 
@@ -237,7 +237,7 @@ CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices) {
     CATDVLIB_DEVICES* snapshot = (CATDVLIB_DEVICES*) memory;
     const char* roots[] = { "/sys/bus/usb/devices", "/sys/bus/pci/devices", "/sys/class/input" };
     if (access("/sys/devices", F_OK) != 0 || access("/proc/self/fd", X_OK) != 0) {
-        CATALYST_STATUS_CODE status = catio_errno(errno);
+        CATALYST_STATUS_CODE status = catdv_errno(errno);
         CATALYST_RESULT released = catmm_free(snapshot);
         if (!CATALYST_STATUS_CODE_IS_SUCCESS(released.status)) return catalyst::RESULT(released.status, 0x01, 0x02, released.detail);
         return catalyst::RESULT(status, 0x01, 0x03, 0);

@@ -40,9 +40,9 @@ typedef CATALYST_BYTE CATDVLIB_DEVICE_TYPE;
  * C API :: OPERATIONS
  * ------------------------------------------------------------------------------------------------- */
 
-/* All input pointers, output slots, live handles and channel indices must be valid.
+/* All input pointers, output slots, live snapshots and device indices must be valid.
  * Borrowed references are invalidated by release; synchronize access externally.
- * Unsupported or unimplemented capabilities are reported, not emulated. */
+ * Discovery and capability metadata do not grant permission to open or operate a device. */
 
 /** Enumerate a snapshot into an empty output slot; null on failure. */
 CATDVLIB_API CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices);

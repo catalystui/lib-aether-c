@@ -1,5 +1,5 @@
 #include "catdvlib.native.hpp"
-#include "catio.darwin.hpp"
+#include "catdvlib.darwin.hpp"
 
 static void catdv_mac_text(IOHIDDeviceRef hid, CFStringRef key, CATDVLIB_NATIVE_TEXT* text) {
     CFTypeRef value = IOHIDDeviceGetProperty(hid, key);
@@ -25,12 +25,12 @@ static catalyst::STATUS_CODE catdv_mac_entry(CATDVLIB_DEVICES* devices, IOHIDDev
     io_service_t service = IOHIDDeviceGetService(hid);
     if (!service) return catalyst::STATUS_CODE_SUCCESS;
     kern_return_t err = IORegistryEntryGetRegistryEntryID(service, &native_id);
-    if (err != KERN_SUCCESS) return catio_mac_status(err);
+    if (err != KERN_SUCCESS) return catdv_mac_status(err);
     CATDVLIB_DEVICE* d;
     catalyst::RESULT r = catdv_native_add(devices, &d);
     if (!catalyst::status_code_is_success(r.status)) return r.status;
     d->scheme = (CATALYST_ASCII) "darwin-hid"; d->type = CATDVLIB_DEVICE_LOGICAL;
-    catio_mac_hex(d->identifier.value, (CATALYST_ULONG) native_id, 16);
+    catdv_mac_hex(d->identifier.value, (CATALYST_ULONG) native_id, 16);
     d->identifier.status = catalyst::STATUS_CODE_SUCCESS;
     catdv_mac_text(hid, CFSTR(kIOHIDManufacturerKey), &d->manufacturer);
     catdv_mac_text(hid, CFSTR(kIOHIDProductKey), &d->product);
@@ -47,22 +47,22 @@ static catalyst::STATUS_CODE catdv_mac_entry(CATDVLIB_DEVICES* devices, IOHIDDev
             if (transport && CFGetTypeID(transport) == CFStringGetTypeID() &&
                 CFStringCompare((CFStringRef) transport, CFSTR("USB"), 0) == kCFCompareEqualTo)
                 d->hwid_scheme = (CATALYST_ASCII) "usb";
-            catio_mac_hex(d->hwids[0].value, vendor, 4);
+            catdv_mac_hex(d->hwids[0].value, vendor, 4);
             d->hwids[0].value[4] = ':';
-            catio_mac_hex(d->hwids[0].value + 5, product, 4);
+            catdv_mac_hex(d->hwids[0].value + 5, product, 4);
             d->hwids[0].status = catalyst::STATUS_CODE_SUCCESS; d->hwid_count = 1;
         }
     } else if (vs != catalyst::STATUS_CODE_SUCCESS && vs != catalyst::STATUS_CODE_ERROR_NOT_FOUND) d->hwid_status = vs;
     else if (ps != catalyst::STATUS_CODE_SUCCESS && ps != catalyst::STATUS_CODE_ERROR_NOT_FOUND) d->hwid_status = ps;
     d->revision.status = catdv_mac_number(hid, CFSTR(kIOHIDVersionNumberKey), &revision);
-    if (d->revision.status == catalyst::STATUS_CODE_SUCCESS) catio_mac_hex(d->revision.value, revision, 16);
+    if (d->revision.status == catalyst::STATUS_CODE_SUCCESS) catdv_mac_hex(d->revision.value, revision, 16);
     CFArrayRef elements = IOHIDDeviceCopyMatchingElements(hid, 0, kIOHIDOptionsTypeNone);
     if (elements) {
         d->capability_status = catalyst::STATUS_CODE_SUCCESS;
         for (CFIndex j = 0; j < CFArrayGetCount(elements); ++j) {
             IOHIDElementRef element = (IOHIDElementRef) CFArrayGetValueAtIndex(elements, j);
-            if (catio_mac_direction(element, catalyst::TRUE)) d->input = catalyst::TRUE;
-            if (catio_mac_direction(element, catalyst::FALSE)) d->output = catalyst::TRUE;
+            if (catdv_mac_direction(element, catalyst::TRUE)) d->input = catalyst::TRUE;
+            if (catdv_mac_direction(element, catalyst::FALSE)) d->output = catalyst::TRUE;
             if (d->input && d->output) break;
         }
         CFRelease(elements);
