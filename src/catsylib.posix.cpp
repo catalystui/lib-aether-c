@@ -7,13 +7,12 @@
 #include "cmakecfg.h"
 #if TARGET_PLATFORM_LINUX || TARGET_PLATFORM_DARWIN
 #include "catsylib.internal.hpp"
-#include "catmmlib.h"
 #include <sys/utsname.h>
 #include <errno.h>
-#include <iconv.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#if TARGET_PLATFORM_LINUX
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 #if TARGET_PLATFORM_DARWIN
 #include <sys/sysctl.h>
 #endif
@@ -36,47 +35,18 @@ static STATUS_CODE catsy_errno_status(int error) {
     }
 }
 
-/* Validate native byte strings as UTF-8 using the system's own converter.
- * No locale changes, replacement characters, or public allocation. */
+/* Native byte strings use the UTF-8 code-unit representation. */
 static CATALYST_RESULT catsy_copy(CATSYLIB_FIELD field, const char* value,
     UTF8W output, NUINT capacity, NUINT* required) {
-    CONTEXT_CODE context = (CONTEXT_CODE) field;
-    size_t length = strlen(value);
-    if (length == 0) return RESULT(STATUS_CODE_ERROR_NOT_FOUND, context, 0x06, 0);
-    if (length >= CATALYST_NUINT_MAX) {
-        return RESULT(STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x07, 0);
-    }
+    return catsy_copy_utf8(field, (UTF8) value, output, capacity, required);
+}
 
-    iconv_t converter = iconv_open("UTF-8", "UTF-8");
-    if (converter == (iconv_t) -1) {
-        return RESULT(catsy_errno_status(errno), context, 0x08, 0);
+/* Compare a terminated native value with a known literal without reading past it. */
+static BOOL catsy_equals(const char* value, const char* literal) {
+    while (*literal != 0) {
+        if (*value++ != *literal++) return FALSE;
     }
-    char* input = const_cast<char*>(value);
-    size_t remaining = length;
-    int error = 0;
-    while (remaining != 0) {
-        char scratch[128];
-        char* destination = scratch;
-        size_t available = sizeof(scratch);
-        if (iconv(converter, &input, &remaining, &destination, &available) == (size_t) -1) {
-            if (errno == E2BIG) continue;
-            error = errno;
-            break;
-        }
-    }
-    if (iconv_close(converter) != 0 && error == 0) {
-        return RESULT(catsy_errno_status(errno), context, 0x09, 0);
-    }
-    if (error != 0) {
-        return RESULT(error == EILSEQ || error == EINVAL
-            ? STATUS_CODE_ERROR_MALFORMED_INPUT : catsy_errno_status(error), context, 0x0A, 0);
-    }
-
-    *required = (NUINT) (length + 1);
-    if (output == 0) return RESULT(STATUS_CODE_SUCCESS, context, 0x01, 0);
-    if (capacity < *required) return RESULT(STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x03, 0);
-    catmm_copy(output, value, *required);
-    return RESULT(STATUS_CODE_SUCCESS, context, 0x02, 0);
+    return *value == 0 ? TRUE : FALSE;
 }
 
 #if TARGET_PLATFORM_LINUX
@@ -130,62 +100,87 @@ static BOOL catsy_os_release_value(char* value) {
 static CATALYST_RESULT catsy_distribution(CATSYLIB_FIELD field, UTF8W output,
     NUINT capacity, NUINT* required) {
     CONTEXT_CODE context = (CONTEXT_CODE) field;
-    FILE* file = fopen("/etc/os-release", "r");
-    if (file == 0 && errno == ENOENT) file = fopen("/usr/lib/os-release", "r");
-    if (file == 0) return RESULT(catsy_errno_status(errno), context, 0x10, 0);
+    int file = open("/etc/os-release", O_RDONLY);
+    if (file < 0 && errno == ENOENT) file = open("/usr/lib/os-release", O_RDONLY);
+    if (file < 0) return RESULT(catsy_errno_status(errno), context, 0x10, 0);
 
-    const char* key = field == CATSYLIB_FIELD_DISTRIBUTION ? "NAME" : "VERSION_ID";
-    size_t keyLength = strlen(key);
-    char* line = 0;
-    size_t allocated = 0;
-    ssize_t count;
-    char* found = 0;
-    STATUS_CODE status = STATUS_CODE_SUCCESS;
+    /* Most os-release files fit on the stack; larger files grow through Core. */
+    char local[4096];
+    CATMMLIB_POINTERW storage = 0;
+    char* data = local;
+    NUINT extent = (NUINT) sizeof(local);
+    NUINT length = 0;
+    RESULT result(STATUS_CODE_SUCCESS, context, 0x01, 0);
     for (;;) {
-        errno = 0;
-        count = getline(&line, &allocated, file);
+        if (length == extent - (NUINT) 1) {
+            if (extent == CATALYST_NUINT_MAX) {
+                result = RESULT(STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x1D, 0);
+                break;
+            }
+            NUINT next = extent > CATALYST_NUINT_MAX / (NUINT) 2
+                ? CATALYST_NUINT_MAX : extent * (NUINT) 2;
+            BOOL first = storage == 0 ? TRUE : FALSE;
+            RESULT grown = catmm_realloc(&storage, next);
+            if (!status_code_is_success(grown.status)) {
+                result = RESULT(grown.status, context, 0x1E, grown.detail);
+                break;
+            }
+            if (first) catmm_copy(storage, local, length);
+            data = (char*) storage;
+            extent = next;
+        }
+        NUINT available = extent - length - (NUINT) 1;
+        /* Bound a native read to a small representable count. */
+        if (available > (NUINT) sizeof(local)) available = (NUINT) sizeof(local);
+        ssize_t count = read(file, data + length, (size_t) available);
         if (count < 0) {
-            if (!feof(file) || ferror(file)) status = catsy_errno_status(errno);
+            result = RESULT(catsy_errno_status(errno), context, 0x11, 0);
             break;
         }
-        if ((size_t) count != strlen(line)) {
-            status = STATUS_CODE_ERROR_MALFORMED_INPUT;
-            break;
-        }
-        while (count > 0 && (line[count - 1] == '\n' || line[count - 1] == '\r')) {
-            line[--count] = 0;
-        }
-        if (strncmp(line, key, keyLength) != 0 || line[keyLength] != '=') continue;
-        char* value = line + keyLength + 1;
-        if (!catsy_os_release_value(value)) {
-            status = STATUS_CODE_ERROR_MALFORMED_INPUT;
-            break;
-        }
-        /* The last assignment wins, as specified by os-release. */
-        char* replacement = strdup(value);
-        if (replacement == 0) {
-            status = STATUS_CODE_ERROR_ALLOCATION_FAILED;
-            break;
-        }
-        free(found);
-        found = replacement;
+        if (count == 0) break;
+        length += (NUINT) count;
     }
-    free(line);
-    int closeError = fclose(file);
-    int closeStatus = errno;
-    if (status != STATUS_CODE_SUCCESS) {
-        free(found);
-        return RESULT(status, context, 0x11, 0);
+    if (close(file) != 0 && status_code_is_success(result.status)) {
+        result = RESULT(catsy_errno_status(errno), context, 0x12, 0);
     }
-    if (closeError != 0) {
-        free(found);
-        return RESULT(catsy_errno_status(closeStatus), context, 0x12, 0);
+    if (status_code_is_success(result.status)) {
+        data[length] = 0;
+        const char* key = field == CATSYLIB_FIELD_DISTRIBUTION ? "NAME" : "VERSION_ID";
+        NUINT keyLength = field == CATSYLIB_FIELD_DISTRIBUTION ? (NUINT) 4 : (NUINT) 10;
+        char* found = 0;
+        NUINT begin = 0;
+        while (begin < length) {
+            NUINT end = begin;
+            while (end < length && data[end] != '\n') {
+                if (data[end] == 0) {
+                    result = RESULT(STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x20, 0);
+                    break;
+                }
+                ++end;
+            }
+            if (!status_code_is_success(result.status)) break;
+            NUINT next = end < length ? end + (NUINT) 1 : end;
+            while (end > begin && data[end - (NUINT) 1] == '\r') --end;
+            data[end] = 0;
+            if (end - begin > keyLength && data[begin + keyLength] == '=' &&
+                catmm_compare(data + begin, key, keyLength) == 0) {
+                char* value = data + begin + keyLength + (NUINT) 1;
+                if (!catsy_os_release_value(value)) {
+                    result = RESULT(STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x21, 0);
+                    break;
+                }
+                found = value; /* Last assignment wins. */
+            }
+            begin = next;
+        }
+        if (status_code_is_success(result.status)) {
+            if (found == 0) result = RESULT(STATUS_CODE_ERROR_NOT_FOUND, context, 0x13, 0);
+            else result = catsy_copy(field, found, output, capacity, required);
+        }
     }
-    if (found == 0) return RESULT(STATUS_CODE_ERROR_NOT_FOUND, context, 0x13, 0);
-    CATALYST_RESULT result = catsy_copy(field, found, output, capacity, required);
-    free(found);
-    return result;
+    return catsy_release(storage, result, 0x22, required);
 }
+
 #endif
 
 #if TARGET_PLATFORM_DARWIN
@@ -196,28 +191,46 @@ static CATALYST_RESULT catsy_distribution(CATSYLIB_FIELD field, UTF8W output,
 static CATALYST_RESULT catsy_distribution_version(CATSYLIB_FIELD field, UTF8W output,
     NUINT capacity, NUINT* required) {
     CONTEXT_CODE context = (CONTEXT_CODE) field;
-    size_t length = 0;
-    if (sysctlbyname("kern.osproductversion", 0, &length, 0, 0) != 0) {
-        return RESULT(errno == ENOENT ? STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED
-            : catsy_errno_status(errno), context, 0x14, 0);
-    }
-    if (length == 0) return RESULT(STATUS_CODE_ERROR_NOT_FOUND, context, 0x15, 0);
+    char local[128];
+    char* value = local;
+    CATMMLIB_POINTERW storage = 0;
+    size_t length = sizeof(local);
     size_t allocated = length;
-    char* value = (char*) malloc(length);
-    if (value == 0) return RESULT(STATUS_CODE_ERROR_ALLOCATION_FAILED, context, 0x16, 0);
     if (sysctlbyname("kern.osproductversion", value, &length, 0, 0) != 0) {
         int error = errno;
-        free(value);
-        return RESULT(catsy_errno_status(error), context, 0x17, 0);
+        if (error != ENOMEM) {
+            return RESULT(error == ENOENT ? STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED
+                : catsy_errno_status(error), context, 0x14, 0);
+        }
+        length = 0;
+        if (sysctlbyname("kern.osproductversion", 0, &length, 0, 0) != 0) {
+            return RESULT(errno == ENOENT ? STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED
+                : catsy_errno_status(errno), context, 0x23, 0);
+        }
+        if (length == 0) return RESULT(STATUS_CODE_ERROR_NOT_FOUND, context, 0x15, 0);
+        if (length > CATALYST_NUINT_MAX) return RESULT(STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x24, 0);
+        allocated = length;
+        RESULT allocation = catmm_alloc(&storage, (NUINT) length);
+        if (!status_code_is_success(allocation.status)) {
+            return RESULT(allocation.status, context, 0x16, allocation.detail);
+        }
+        value = (char*) storage;
+        if (sysctlbyname("kern.osproductversion", value, &length, 0, 0) != 0) {
+            return catsy_release(storage, RESULT(catsy_errno_status(errno), context, 0x17, 0), 0x25, required);
+        }
     }
-    if (length == 0 || length > allocated || value[length - 1] != 0 || strlen(value) != length - 1) {
-        free(value);
-        return RESULT(STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x18, 0);
+    RESULT result;
+    if (length == 0 || length > allocated || value[length - 1] != 0) {
+        result = RESULT(STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x18, 0);
+    } else {
+        size_t i = 0;
+        while (i < length - 1 && value[i] != 0) ++i;
+        if (i != length - 1) result = RESULT(STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x26, 0);
+        else result = catsy_copy(field, value, output, capacity, required);
     }
-    CATALYST_RESULT result = catsy_copy(field, value, output, capacity, required);
-    free(value);
-    return result;
+    return catsy_release(storage, result, 0x27, required);
 }
+
 #endif
 
 /* -------------------------------------------------------------------------------------------------
@@ -256,14 +269,14 @@ CATALYST_RESULT catsy_platform_get(CATSYLIB_FIELD field, UTF8W output,
         case CATSYLIB_FIELD_VERSION: return catsy_copy(field, system.release, output, capacity, required);
         case CATSYLIB_FIELD_HOSTNAME: return catsy_copy(field, system.nodename, output, capacity, required);
         case CATSYLIB_FIELD_ARCHITECTURE:
-            if (strcmp(system.machine, "aarch64") == 0) {
+            if (catsy_equals(system.machine, "aarch64")) {
                 return catsy_copy(field, "arm64", output, capacity, required);
             }
-            if (strcmp(system.machine, "amd64") == 0) {
+            if (catsy_equals(system.machine, "amd64")) {
                 return catsy_copy(field, "x86_64", output, capacity, required);
             }
-            if (strcmp(system.machine, "i386") == 0 || strcmp(system.machine, "i486") == 0 ||
-                strcmp(system.machine, "i586") == 0 || strcmp(system.machine, "i686") == 0) {
+            if (catsy_equals(system.machine, "i386") || catsy_equals(system.machine, "i486") ||
+                catsy_equals(system.machine, "i586") || catsy_equals(system.machine, "i686")) {
                 return catsy_copy(field, "x86", output, capacity, required);
             }
             return catsy_copy(field, system.machine, output, capacity, required);

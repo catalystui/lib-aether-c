@@ -299,14 +299,27 @@ static int benchmark_case(const Benchmark& benchmark, bool sizeOnly, UTF8W outpu
             std::printf("  FAIL: baseline timing/verification\n");
             return 1;
         }
-        if (elapsed >= 0.025 || calls >= 1048576UL) break;
+        if (elapsed >= 0.025 || calls >= 16777216UL) break;
         calls *= 2;
     } while (true);
+    unsigned long counts[4] = { calls, calls, calls, calls };
+    // A constant-valued native reference can be much faster than the backend.
+    // Calibrate its own batch size while retaining paired backend/C/C++ batches.
+    if (modes == 4) {
+        for (;;) {
+            if (!measure(benchmark, 3, destination, capacity, expected, counts[3], sizeOnly, &elapsed)) {
+                std::printf("  FAIL: direct reference timing/verification\n");
+                return 1;
+            }
+            if (elapsed >= 0.025 || counts[3] >= 16777216UL) break;
+            counts[3] *= 2;
+        }
+    }
     double samples[4][3];
     for (unsigned int sample = 0; sample < 3; ++sample) {
         for (unsigned int step = 0; step < modes; ++step) {
             unsigned int mode = sample % 2 == 0 ? step : modes - 1 - step;
-            if (!measure(benchmark, mode, destination, capacity, expected, calls, sizeOnly, &samples[mode][sample]) ||
+            if (!measure(benchmark, mode, destination, capacity, expected, counts[mode], sizeOnly, &samples[mode][sample]) ||
                 (!sizeOnly && std::memcmp(output, reference, (size_t) expected) != 0)) {
                 std::printf("  FAIL: timed output/status mismatch (%u)\n", mode);
                 return 1;
@@ -315,17 +328,18 @@ static int benchmark_case(const Benchmark& benchmark, bool sizeOnly, UTF8W outpu
     }
     double base = median(samples[0]);
     const char* labels[] = { "Native backend", "Catalyst C", "Catalyst C++", "Direct native C API" };
-    std::printf("  %s (%lu calls/sample)\n", sizeOnly ? "Size query" : "Output query", calls);
+    std::printf("  %s (%lu calls/sample for backend and public APIs)\n", sizeOnly ? "Size query" : "Output query", calls);
     for (unsigned int mode = 0; mode < modes; ++mode) {
         double elapsedTime = median(samples[mode]);
         if (elapsedTime < 0.001 || elapsedTime * CLOCKS_PER_SEC < 20) {
-            std::printf("    %-21s short sample; timing unavailable\n", labels[mode]);
+            std::printf("    %-21s short sample; timing unavailable (%lu calls)\n", labels[mode], counts[mode]);
             continue;
         }
         std::printf("    %-21s %12.1f ns/call  %12.0f calls/s", labels[mode],
-            elapsedTime * 1e9 / (double) calls, (double) calls / elapsedTime);
+            elapsedTime * 1e9 / (double) counts[mode], (double) counts[mode] / elapsedTime);
         if (mode != 0 && mode != 3 && base >= 0.001 && base * CLOCKS_PER_SEC >= 20)
             std::printf("  %+8.2f%% vs backend", (elapsedTime / base - 1.0) * 100.0);
+        if (mode == 3) std::printf("  (%lu calls/sample)", counts[mode]);
         std::printf("\n");
     }
     double direct = modes == 4 ? median(samples[3]) : 0;
@@ -333,7 +347,7 @@ static int benchmark_case(const Benchmark& benchmark, bool sizeOnly, UTF8W outpu
     if (direct >= 0.001 && direct * CLOCKS_PER_SEC >= 20 && comparison >= 0.001 &&
         comparison * CLOCKS_PER_SEC >= 20)
         std::printf("    C vs direct native: %+8.2f%% (includes validation/normalization differences)\n",
-            (comparison / direct - 1.0) * 100.0);
+            ((comparison / (double) counts[1]) / (direct / (double) counts[3]) - 1.0) * 100.0);
     else if (modes == 3) std::printf("    Direct native reference unavailable or not equivalent on this target.\n");
     return 0;
 }
@@ -347,7 +361,7 @@ int main() {
     }
     std::printf("CATSYLIB Performance (Release recommended)\n");
     std::printf("Target: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
-    std::printf("Median of three paired CPU-time samples; %lu ticks/second.\n", (unsigned long) CLOCKS_PER_SEC);
+    std::printf("Median of three interleaved CPU-time samples; %lu ticks/second.\n", (unsigned long) CLOCKS_PER_SEC);
     std::printf("Backend baseline isolates public dispatch/wrapper overhead, not native acquisition overhead.\n");
     std::printf("Independent direct C API reference covers all six fields where its bounded fixtures match; it omits full POSIX UTF-8 validation.\n");
     int failed = 0;
