@@ -2,7 +2,20 @@
     "navigation": [
         {
             "title": "Overview",
-            "path": "/"
+            "path": "/",
+            "alignment": "block"
+        },
+        {
+            "title": "API Reference",
+            "path": "/api-reference",
+            "children": [
+                {
+                    "title": "CATSYLIB",
+                    "path": "/api-reference/catsylib",
+                    "alignment": "block"
+                }
+            ],
+            "alignment": "block"
         }
     ]
 }

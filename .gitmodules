@@ -1,3 +1,6 @@
 [submodule "cmake"]
 	path = cmake
 	url = https://github.com/catalystui/build-cmake.git
+[submodule "core"]
+	path = core
+	url = https://github.com/catalystui/lib-core-c.git

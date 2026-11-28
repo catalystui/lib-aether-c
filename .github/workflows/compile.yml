@@ -72,7 +72,7 @@ jobs:
           }
           foreach ($header in $headers) {
             $relative = [IO.Path]::GetRelativePath((Resolve-Path include).Path, $header.FullName)
-            "#include `"$relative`"" | gcc ${{ matrix.flags }} -std=c${{ matrix.c }} -pedantic-errors -Iinclude -Itarget/ci/generated -x c -fsyntax-only -
+            "#include `"$relative`"" | gcc ${{ matrix.flags }} -std=c${{ matrix.c }} -pedantic-errors -Iinclude -Icore/include -Itarget/ci/generated -x c -fsyntax-only -
           }
 
       - name: Compile public C++ headers
@@ -84,5 +84,5 @@ jobs:
           }
           foreach ($header in $headers) {
             $relative = [IO.Path]::GetRelativePath((Resolve-Path include).Path, $header.FullName)
-            "#include `"$relative`"" | g++ ${{ matrix.flags }} -std=c++${{ matrix.cpp }} -pedantic-errors -Iinclude -Itarget/ci/generated -x c++ -fsyntax-only -
+            "#include `"$relative`"" | g++ ${{ matrix.flags }} -std=c++${{ matrix.cpp }} -pedantic-errors -Iinclude -Icore/include -Itarget/ci/generated -x c++ -fsyntax-only -
           }
