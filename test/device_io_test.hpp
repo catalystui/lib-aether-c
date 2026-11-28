@@ -129,7 +129,8 @@ static inline PerfSample median_io(PerfSample* samples) {
 }
 
 static inline int benchmark_io(const char* name, PerfCall call, void* fixture, BYTE context,
-                              unsigned long limit, bool stable = true) {
+                              unsigned long limit, bool stable = true, double* cNanoseconds = 0) {
+    if (cNanoseconds) *cNanoseconds = 0;
     std::printf("\n%s\n", name);
     PerfOutcome a = call(fixture, false), b = call(fixture, true);
     if (a.result.context != context || b.result.context != context ||
@@ -167,6 +168,8 @@ static inline int benchmark_io(const char* name, PerfCall call, void* fixture, B
             if (!measure_io(call, fixture, mode != 0, calls, context, &samples[mode][j])) return 1;
         }
     PerfSample c = median_io(samples[0]), cpp = median_io(samples[1]);
+    if (cNanoseconds && c.seconds >= 0.001 && c.seconds * CLOCKS_PER_SEC >= 20)
+        *cNanoseconds = c.seconds * 1e9 / calls;
     PerfSample values[] = {c, cpp};
     const char* labels[] = {"Catalyst C", "Catalyst C++"};
     for (BYTE j = 0; j < 2; ++j) {
@@ -179,6 +182,8 @@ static inline int benchmark_io(const char* name, PerfCall call, void* fixture, B
         } else std::printf("; sample too short for reliable timing");
         std::printf("\n");
     }
+    if (c.seconds < 0.001 || cpp.seconds < 0.001 ||
+        c.seconds * CLOCKS_PER_SEC < 20 || cpp.seconds * CLOCKS_PER_SEC < 20) return 2;
     return 0;
 }
 static inline void perf_record(int result, int* failed, int* unavailable) {

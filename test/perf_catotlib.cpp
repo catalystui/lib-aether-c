@@ -1,4 +1,4 @@
-#include "device_io_test.hpp"
+#include "device_io_native.hpp"
 #include "catotlib.hpp"
 #if TARGET_PLATFORM_LINUX
 #include <linux/input.h>
@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
     bool write = argc == 4 && std::strcmp(argv[1], "--write") == 0;
     if (argc != 1 && !write) { std::printf("Usage: perf_catotlib [--write SCHEME INSTANCE_ID]\n"); return 1; }
     std::printf("CATOTLIB Performance (Release recommended)\nTarget: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
-    std::printf("Median of three CPU-time samples; C API baseline vs equivalent C++ wrapper.\n");
+    std::printf("Median of three CPU-time samples; C API vs C++ wrapper; independent direct native state/range reference when the same device/channel/value is available.\n");
     std::printf("Read-only by default. --write SCHEME INSTANCE_ID benchmarks same-value writes on the selected snapshot entry; no guessed reports.\n");
     CATDVLIB_DEVICES* snapshot = 0;
     RESULT r = catdv_devices_enumerate(&snapshot);
@@ -101,15 +101,15 @@ int main(int argc, char** argv) {
         ++opened;
 
         f.field = 0x04;
-        perf_record(benchmark_io("channel count", query, &f, f.field, 1048576UL), &failed, &unavailable);
+        perf_record(benchmark_io("channel count", query, &f, f.field, 16777216UL), &failed, &unavailable);
         NUINT count = 0;
         if (catot_device_get_channel_count(f.resource, &count).status == STATUS_CODE_SUCCESS) {
             bool digital = false, absolute = false;
             if (count) {
                 f.channel = 0; f.field = 0x05;
-                perf_record(benchmark_io("channel type", query, &f, f.field, 1048576UL), &failed, &unavailable);
+                perf_record(benchmark_io("channel type", query, &f, f.field, 16777216UL), &failed, &unavailable);
                 f.field = 0x06;
-                perf_record(benchmark_io("channel identifier", query, &f, f.field, 1048576UL), &failed, &unavailable);
+                perf_record(benchmark_io("channel identifier", query, &f, f.field, 16777216UL), &failed, &unavailable);
             }
             for (NUINT k = 0; k < count; ++k) {
                 CATOTLIB_CHANNEL_TYPE type = CATOTLIB_CHANNEL_UNKNOWN;
@@ -117,7 +117,15 @@ int main(int argc, char** argv) {
                 f.channel = k;
                 if (type == CATOTLIB_CHANNEL_DIGITAL && !digital) {
                     digital = true; f.field = 0x07;
-                    perf_record(benchmark_io("digital state", query, &f, f.field, 32768, false), &failed, &unavailable);
+                    double cNs = 0;
+                    perf_record(benchmark_io("digital state", query, &f, f.field, 16777216UL, false, &cNs), &failed, &unavailable);
+#if CATALYST_SUPPORTS_32BIT
+                    CATDVLIB_IDENTIFIER channelId = {0, 0};
+                    BOOL state = FALSE;
+                    if (catot_channel_get_identifier(f.resource, k, &channelId).status == STATUS_CODE_SUCCESS &&
+                        catot_digital_get_state(f.resource, k, &state).status == STATUS_CODE_SUCCESS)
+                        benchmark_native_state(d, channelId, true, false, true, state ? 1 : 0, 0, cNs);
+#endif
                     if (write && catot_digital_get_state(f.resource, k, &f.state).status == STATUS_CODE_SUCCESS) {
                         f.field = 0x08;
                         int measured = benchmark_io("reapply digital state", query, &f, f.field, 64, false);
@@ -145,9 +153,17 @@ int main(int argc, char** argv) {
 #if CATALYST_SUPPORTS_32BIT
                 if (type == CATOTLIB_CHANNEL_ABSOLUTE && !absolute) {
                     absolute = true; f.field = 0x09;
-                    perf_record(benchmark_io("absolute range", query, &f, f.field, 32768), &failed, &unavailable);
+                    double cRange = 0, cValue = 0;
+                    perf_record(benchmark_io("absolute range", query, &f, f.field, 16777216UL, true, &cRange), &failed, &unavailable);
+                    CATDVLIB_IDENTIFIER channelId = {0, 0};
+                    INT low = 0, high = 0, value = 0;
+                    bool identified = catot_channel_get_identifier(f.resource, k, &channelId).status == STATUS_CODE_SUCCESS;
+                    if (identified && catot_absolute_get_range(f.resource, k, &low, &high).status == STATUS_CODE_SUCCESS)
+                        benchmark_native_state(d, channelId, true, true, false, low, high, cRange);
                     f.field = 0x0A;
-                    perf_record(benchmark_io("absolute value", query, &f, f.field, 32768, false), &failed, &unavailable);
+                    perf_record(benchmark_io("absolute value", query, &f, f.field, 16777216UL, false, &cValue), &failed, &unavailable);
+                    if (identified && catot_absolute_get_value(f.resource, k, &value).status == STATUS_CODE_SUCCESS)
+                        benchmark_native_state(d, channelId, true, false, false, value, 0, cValue);
                     if (write && catot_absolute_get_value(f.resource, k, &f.value).status == STATUS_CODE_SUCCESS) {
                         f.field = 0x0B;
                         int measured = benchmark_io("reapply absolute value", query, &f, f.field, 64, false);

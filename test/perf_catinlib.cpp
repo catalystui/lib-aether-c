@@ -1,4 +1,4 @@
-#include "device_io_test.hpp"
+#include "device_io_native.hpp"
 #include "catinlib.hpp"
 
 struct Fixture { const CATDVLIB_DEVICE* device; CATINLIB_INPUT* resource; NUINT channel; BYTE field; };
@@ -34,7 +34,7 @@ static PerfOutcome query(void* fixture, bool cpp) {
 }
 int main() {
     std::printf("CATINLIB Performance (Release recommended)\nTarget: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
-    std::printf("Median of three CPU-time samples; C API baseline vs equivalent C++ wrapper.\n");
+    std::printf("Median of three CPU-time samples; C API vs C++ wrapper; independent direct native state/range reference when the same device/channel/value is available.\n");
     std::printf("Nonblocking polling measures CPU cost, not physical input throughput. Raw and typed polling consume events.\n");
     CATDVLIB_DEVICES* snapshot = 0;
     RESULT r = catdv_devices_enumerate(&snapshot);
@@ -53,18 +53,18 @@ int main() {
         ++opened;
         if (CATALYST_NUINT_MAX >= 4096) {
             f.field = 0x03;
-            perf_record(benchmark_io("native read polling", query, &f, f.field, 32768, false), &failed, &unavailable);
+            perf_record(benchmark_io("native read polling", query, &f, f.field, 16777216UL, false), &failed, &unavailable);
         } else ++unavailable;
         f.field = 0x04;
-        perf_record(benchmark_io("channel count", query, &f, f.field, 1048576UL), &failed, &unavailable);
+        perf_record(benchmark_io("channel count", query, &f, f.field, 16777216UL), &failed, &unavailable);
         NUINT count = 0;
         if (catin_device_get_channel_count(f.resource, &count).status == STATUS_CODE_SUCCESS) {
             bool digital = false, absolute = false, relative = false;
             if (count) {
                 f.channel = 0; f.field = 0x05;
-                perf_record(benchmark_io("channel type", query, &f, f.field, 1048576UL), &failed, &unavailable);
+                perf_record(benchmark_io("channel type", query, &f, f.field, 16777216UL), &failed, &unavailable);
                 f.field = 0x06;
-                perf_record(benchmark_io("channel identifier", query, &f, f.field, 1048576UL), &failed, &unavailable);
+                perf_record(benchmark_io("channel identifier", query, &f, f.field, 16777216UL), &failed, &unavailable);
             }
             for (NUINT k = 0; k < count; ++k) {
                 CATINLIB_CHANNEL_TYPE type = CATINLIB_CHANNEL_UNKNOWN;
@@ -72,20 +72,36 @@ int main() {
                 f.channel = k;
                 if (type == CATINLIB_CHANNEL_DIGITAL && !digital) {
                     digital = true; f.field = 0x07;
-                    perf_record(benchmark_io("digital state", query, &f, f.field, 32768, false), &failed, &unavailable);
+                    double cNs = 0;
+                    perf_record(benchmark_io("digital state", query, &f, f.field, 16777216UL, false, &cNs), &failed, &unavailable);
+#if CATALYST_SUPPORTS_32BIT
+                    CATDVLIB_IDENTIFIER channelId = {0, 0};
+                    BOOL state = FALSE;
+                    if (catin_channel_get_identifier(f.resource, k, &channelId).status == STATUS_CODE_SUCCESS &&
+                        catin_digital_get_state(f.resource, k, &state).status == STATUS_CODE_SUCCESS)
+                        benchmark_native_state(d, channelId, false, false, true, state ? 1 : 0, 0, cNs);
+#endif
                     f.field = 0x08;
-                    perf_record(benchmark_io("digital occurrence polling", query, &f, f.field, 32768, false), &failed, &unavailable);
+                    perf_record(benchmark_io("digital occurrence polling", query, &f, f.field, 16777216UL, false), &failed, &unavailable);
                 }
 #if CATALYST_SUPPORTS_32BIT
                 if (type == CATINLIB_CHANNEL_ABSOLUTE && !absolute) {
                     absolute = true; f.field = 0x09;
-                    perf_record(benchmark_io("absolute range", query, &f, f.field, 32768), &failed, &unavailable);
+                    double cRange = 0, cValue = 0;
+                    perf_record(benchmark_io("absolute range", query, &f, f.field, 16777216UL, true, &cRange), &failed, &unavailable);
+                    CATDVLIB_IDENTIFIER channelId = {0, 0};
+                    INT low = 0, high = 0, value = 0;
+                    bool identified = catin_channel_get_identifier(f.resource, k, &channelId).status == STATUS_CODE_SUCCESS;
+                    if (identified && catin_absolute_get_range(f.resource, k, &low, &high).status == STATUS_CODE_SUCCESS)
+                        benchmark_native_state(d, channelId, false, true, false, low, high, cRange);
                     f.field = 0x0A;
-                    perf_record(benchmark_io("absolute value", query, &f, f.field, 32768, false), &failed, &unavailable);
+                    perf_record(benchmark_io("absolute value", query, &f, f.field, 16777216UL, false, &cValue), &failed, &unavailable);
+                    if (identified && catin_absolute_get_value(f.resource, k, &value).status == STATUS_CODE_SUCCESS)
+                        benchmark_native_state(d, channelId, false, false, false, value, 0, cValue);
                 }
                 if (type == CATINLIB_CHANNEL_RELATIVE && !relative) {
                     relative = true; f.field = 0x0B;
-                    perf_record(benchmark_io("relative occurrence polling", query, &f, f.field, 32768, false), &failed, &unavailable);
+                    perf_record(benchmark_io("relative occurrence polling", query, &f, f.field, 16777216UL, false), &failed, &unavailable);
                 }
 #endif
             }

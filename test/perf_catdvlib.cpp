@@ -1,4 +1,4 @@
-#include "device_io_test.hpp"
+#include "device_io_native.hpp"
 
 struct DeviceFixture { const CATDVLIB_DEVICE* device; NUINT index; BYTE field; };
 static PerfOutcome enumerate(void*, bool cpp) {
@@ -38,9 +38,12 @@ static PerfOutcome query(void* fixture, bool cpp) {
 int main() {
     std::printf("CATDVLIB Performance (Release recommended)\nTarget: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
     std::printf("Median of three CPU-time samples. Enumeration includes allocation and release; other queries use a cached snapshot.\n");
-    std::printf("C is the public API baseline; C++ measures the equivalent wrapper. No independent native enumeration is equivalent to the complete snapshot contract.\n");
+    std::printf("C is the public API baseline; C++ measures the equivalent wrapper. Direct native discovery, where provided, is narrower than a complete snapshot and is not used for a relative overhead claim.\n");
     int failed = 0, unavailable = 0;
-    perf_record(benchmark_io("enumerate / count / free", enumerate, 0, 0x01, 16, false), &failed, &unavailable);
+    perf_record(benchmark_io("enumerate / count / free", enumerate, 0, 0x01, 64, false), &failed, &unavailable);
+#if TARGET_PLATFORM_DARWIN
+    benchmark_native_discovery();
+#endif
     CATDVLIB_DEVICES* snapshot = 0;
     RESULT r = catdv_devices_enumerate(&snapshot);
     if (r.status != STATUS_CODE_SUCCESS || !snapshot) return failed ? 1 : 2;
