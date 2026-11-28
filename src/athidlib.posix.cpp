@@ -6,7 +6,7 @@
 #endif
 #include "cmakecfg.h"
 #if TARGET_PLATFORM_LINUX || TARGET_PLATFORM_DARWIN
-#include "catsylib.internal.hpp"
+#include "athidlib.internal.hpp"
 #include "catalyst.hpp"
 #include "catmmlib.h"
 #include <sys/utsname.h>
@@ -27,7 +27,7 @@
  * Native text retrieval
  * ------------------------------------------------------------------------------------------------- */
 
-static catalyst::STATUS_CODE catsy_errno_status(int error) {
+static catalyst::STATUS_CODE athid_errno_status(int error) {
     switch (error) {
         case EACCES:
         case EPERM: return catalyst::STATUS_CODE_ERROR_ACCESS_DENIED;
@@ -40,13 +40,13 @@ static catalyst::STATUS_CODE catsy_errno_status(int error) {
 }
 
 /* Native byte strings use the UTF-8 code-unit representation. */
-static CATALYST_RESULT catsy_copy(CATSYLIB_FIELD field, const char* value,
+static CATALYST_RESULT athid_copy(ATHIDLIB_FIELD field, const char* value,
     catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
-    return catsy_copy_utf8(field, (catalyst::UTF8) value, output, capacity, required);
+    return athid_copy_utf8(field, (catalyst::UTF8) value, output, capacity, required);
 }
 
 /* Compare a terminated native value with a known literal without reading past it. */
-static catalyst::BOOL catsy_equals(const char* value, const char* literal) {
+static catalyst::BOOL athid_equals(const char* value, const char* literal) {
     while (*literal != 0) {
         if (*value++ != *literal++) return catalyst::FALSE;
     }
@@ -60,7 +60,7 @@ static catalyst::BOOL catsy_equals(const char* value, const char* literal) {
 
 /* Decode one os-release assignment in place. Never execute the file or expand
  * variables. Quoted and escaped shell characters are treated as data. */
-static catalyst::BOOL catsy_os_release_value(char* value) {
+static catalyst::BOOL athid_os_release_value(char* value) {
     char* source = value;
     char* destination = value;
     char quote = 0;
@@ -101,12 +101,12 @@ static catalyst::BOOL catsy_os_release_value(char* value) {
     return catalyst::TRUE;
 }
 
-static CATALYST_RESULT catsy_distribution(CATSYLIB_FIELD field, catalyst::UTF8W output,
+static CATALYST_RESULT athid_distribution(ATHIDLIB_FIELD field, catalyst::UTF8W output,
     catalyst::NUINT capacity, catalyst::NUINT* required) {
     catalyst::CONTEXT_CODE context = (catalyst::CONTEXT_CODE) field;
     int file = open("/etc/os-release", O_RDONLY);
     if (file < 0 && errno == ENOENT) file = open("/usr/lib/os-release", O_RDONLY);
-    if (file < 0) return catalyst::RESULT(catsy_errno_status(errno), context, 0x10, 0);
+    if (file < 0) return catalyst::RESULT(athid_errno_status(errno), context, 0x10, 0);
 
     /* Most os-release files fit on the stack; larger files grow through Core. */
     char local[4096];
@@ -138,19 +138,19 @@ static CATALYST_RESULT catsy_distribution(CATSYLIB_FIELD field, catalyst::UTF8W 
         if (available > (catalyst::NUINT) sizeof(local)) available = (catalyst::NUINT) sizeof(local);
         ssize_t count = read(file, data + length, (size_t) available);
         if (count < 0) {
-            result = catalyst::RESULT(catsy_errno_status(errno), context, 0x11, 0);
+            result = catalyst::RESULT(athid_errno_status(errno), context, 0x11, 0);
             break;
         }
         if (count == 0) break;
         length += (catalyst::NUINT) count;
     }
     if (close(file) != 0 && catalyst::status_code_is_success(result.status)) {
-        result = catalyst::RESULT(catsy_errno_status(errno), context, 0x12, 0);
+        result = catalyst::RESULT(athid_errno_status(errno), context, 0x12, 0);
     }
     if (catalyst::status_code_is_success(result.status)) {
         data[length] = 0;
-        const char* key = field == CATSYLIB_FIELD_DISTRIBUTION ? "NAME" : "VERSION_ID";
-        catalyst::NUINT keyLength = field == CATSYLIB_FIELD_DISTRIBUTION ? (catalyst::NUINT) 4 : (catalyst::NUINT) 10;
+        const char* key = field == ATHIDLIB_FIELD_DISTRIBUTION ? "NAME" : "VERSION_ID";
+        catalyst::NUINT keyLength = field == ATHIDLIB_FIELD_DISTRIBUTION ? (catalyst::NUINT) 4 : (catalyst::NUINT) 10;
         char* found = 0;
         catalyst::NUINT begin = 0;
         while (begin < length) {
@@ -169,7 +169,7 @@ static CATALYST_RESULT catsy_distribution(CATSYLIB_FIELD field, catalyst::UTF8W 
             if (end - begin > keyLength && data[begin + keyLength] == '=' &&
                 catmm_compare(data + begin, key, keyLength) == 0) {
                 char* value = data + begin + keyLength + (catalyst::NUINT) 1;
-                if (!catsy_os_release_value(value)) {
+                if (!athid_os_release_value(value)) {
                     result = catalyst::RESULT(catalyst::STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x21, 0);
                     break;
                 }
@@ -179,10 +179,10 @@ static CATALYST_RESULT catsy_distribution(CATSYLIB_FIELD field, catalyst::UTF8W 
         }
         if (catalyst::status_code_is_success(result.status)) {
             if (found == 0) result = catalyst::RESULT(catalyst::STATUS_CODE_ERROR_NOT_FOUND, context, 0x13, 0);
-            else result = catsy_copy(field, found, output, capacity, required);
+            else result = athid_copy(field, found, output, capacity, required);
         }
     }
-    return catsy_release(storage, result, 0x22, required);
+    return athid_release(storage, result, 0x22, required);
 }
 #endif
 
@@ -191,7 +191,7 @@ static CATALYST_RESULT catsy_distribution(CATSYLIB_FIELD field, catalyst::UTF8W 
  * Darwin distribution identification
  * ------------------------------------------------------------------------------------------------- */
 
-static CATALYST_RESULT catsy_distribution_version(CATSYLIB_FIELD field, catalyst::UTF8W output,
+static CATALYST_RESULT athid_distribution_version(ATHIDLIB_FIELD field, catalyst::UTF8W output,
     catalyst::NUINT capacity, catalyst::NUINT* required) {
     catalyst::CONTEXT_CODE context = (catalyst::CONTEXT_CODE) field;
     char local[128];
@@ -203,12 +203,12 @@ static CATALYST_RESULT catsy_distribution_version(CATSYLIB_FIELD field, catalyst
         int error = errno;
         if (error != ENOMEM) {
             return catalyst::RESULT(error == ENOENT ? catalyst::STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED
-                : catsy_errno_status(error), context, 0x14, 0);
+                : athid_errno_status(error), context, 0x14, 0);
         }
         length = 0;
         if (sysctlbyname("kern.osproductversion", 0, &length, 0, 0) != 0) {
             return catalyst::RESULT(errno == ENOENT ? catalyst::STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED
-                : catsy_errno_status(errno), context, 0x23, 0);
+                : athid_errno_status(errno), context, 0x23, 0);
         }
         if (length == 0) return catalyst::RESULT(catalyst::STATUS_CODE_ERROR_NOT_FOUND, context, 0x15, 0);
         if (length > CATALYST_NUINT_MAX) return catalyst::RESULT(catalyst::STATUS_CODE_ERROR_BUFFER_OVERFLOW, context, 0x24, 0);
@@ -219,7 +219,7 @@ static CATALYST_RESULT catsy_distribution_version(CATSYLIB_FIELD field, catalyst
         }
         value = (char*) storage;
         if (sysctlbyname("kern.osproductversion", value, &length, 0, 0) != 0) {
-            return catsy_release(storage, catalyst::RESULT(catsy_errno_status(errno), context, 0x17, 0), 0x25, required);
+            return athid_release(storage, catalyst::RESULT(athid_errno_status(errno), context, 0x17, 0), 0x25, required);
         }
     }
     catalyst::RESULT result;
@@ -229,9 +229,9 @@ static CATALYST_RESULT catsy_distribution_version(CATSYLIB_FIELD field, catalyst
         size_t i = 0;
         while (i < length - 1 && value[i] != 0) ++i;
         if (i != length - 1) result = catalyst::RESULT(catalyst::STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x26, 0);
-        else result = catsy_copy(field, value, output, capacity, required);
+        else result = athid_copy(field, value, output, capacity, required);
     }
-    return catsy_release(storage, result, 0x27, required);
+    return athid_release(storage, result, 0x27, required);
 }
 #endif
 
@@ -239,49 +239,49 @@ static CATALYST_RESULT catsy_distribution_version(CATSYLIB_FIELD field, catalyst
  * System identification
  * ------------------------------------------------------------------------------------------------- */
 
-CATALYST_RESULT catsy_platform_get(CATSYLIB_FIELD field, catalyst::UTF8W output,
+CATALYST_RESULT athid_platform_get(ATHIDLIB_FIELD field, catalyst::UTF8W output,
     catalyst::NUINT capacity, catalyst::NUINT* required) {
     catalyst::CONTEXT_CODE context = (catalyst::CONTEXT_CODE) field;
 #if TARGET_PLATFORM_LINUX
-    if (field == CATSYLIB_FIELD_DISTRIBUTION || field == CATSYLIB_FIELD_DISTRIBUTION_VERSION) {
-        return catsy_distribution(field, output, capacity, required);
+    if (field == ATHIDLIB_FIELD_DISTRIBUTION || field == ATHIDLIB_FIELD_DISTRIBUTION_VERSION) {
+        return athid_distribution(field, output, capacity, required);
     }
 #elif TARGET_PLATFORM_DARWIN
-    if (field == CATSYLIB_FIELD_DISTRIBUTION) return catsy_copy(field, "macOS", output, capacity, required);
-    if (field == CATSYLIB_FIELD_DISTRIBUTION_VERSION) {
-        return catsy_distribution_version(field, output, capacity, required);
+    if (field == ATHIDLIB_FIELD_DISTRIBUTION) return athid_copy(field, "macOS", output, capacity, required);
+    if (field == ATHIDLIB_FIELD_DISTRIBUTION_VERSION) {
+        return athid_distribution_version(field, output, capacity, required);
     }
-    if (field == CATSYLIB_FIELD_ARCHITECTURE) {
+    if (field == ATHIDLIB_FIELD_ARCHITECTURE) {
         int translated = 0;
         size_t size = sizeof(translated);
         if (sysctlbyname("sysctl.proc_translated", &translated, &size, 0, 0) == 0) {
             if (size != sizeof(translated) || (translated != 0 && translated != 1)) {
                 return catalyst::RESULT(catalyst::STATUS_CODE_ERROR_MALFORMED_INPUT, context, 0x1B, 0);
             }
-            if (translated == 1) return catsy_copy(field, "arm64", output, capacity, required);
+            if (translated == 1) return athid_copy(field, "arm64", output, capacity, required);
         } else if (errno != ENOENT) {
-            return catalyst::RESULT(catsy_errno_status(errno), context, 0x1C, 0);
+            return catalyst::RESULT(athid_errno_status(errno), context, 0x1C, 0);
         }
     }
 #endif
     struct utsname system;
-    if (uname(&system) != 0) return catalyst::RESULT(catsy_errno_status(errno), context, 0x19, 0);
+    if (uname(&system) != 0) return catalyst::RESULT(athid_errno_status(errno), context, 0x19, 0);
     switch (field) {
-        case CATSYLIB_FIELD_NAME: return catsy_copy(field, system.sysname, output, capacity, required);
-        case CATSYLIB_FIELD_VERSION: return catsy_copy(field, system.release, output, capacity, required);
-        case CATSYLIB_FIELD_HOSTNAME: return catsy_copy(field, system.nodename, output, capacity, required);
-        case CATSYLIB_FIELD_ARCHITECTURE:
-            if (catsy_equals(system.machine, "aarch64")) {
-                return catsy_copy(field, "arm64", output, capacity, required);
+        case ATHIDLIB_FIELD_NAME: return athid_copy(field, system.sysname, output, capacity, required);
+        case ATHIDLIB_FIELD_VERSION: return athid_copy(field, system.release, output, capacity, required);
+        case ATHIDLIB_FIELD_HOSTNAME: return athid_copy(field, system.nodename, output, capacity, required);
+        case ATHIDLIB_FIELD_ARCHITECTURE:
+            if (athid_equals(system.machine, "aarch64")) {
+                return athid_copy(field, "arm64", output, capacity, required);
             }
-            if (catsy_equals(system.machine, "amd64")) {
-                return catsy_copy(field, "x86_64", output, capacity, required);
+            if (athid_equals(system.machine, "amd64")) {
+                return athid_copy(field, "x86_64", output, capacity, required);
             }
-            if (catsy_equals(system.machine, "i386") || catsy_equals(system.machine, "i486") ||
-                catsy_equals(system.machine, "i586") || catsy_equals(system.machine, "i686")) {
-                return catsy_copy(field, "x86", output, capacity, required);
+            if (athid_equals(system.machine, "i386") || athid_equals(system.machine, "i486") ||
+                athid_equals(system.machine, "i586") || athid_equals(system.machine, "i686")) {
+                return athid_copy(field, "x86", output, capacity, required);
             }
-            return catsy_copy(field, system.machine, output, capacity, required);
+            return athid_copy(field, system.machine, output, capacity, required);
         default: return catalyst::RESULT(catalyst::STATUS_CODE_FATAL_INVARIANT_VIOLATION, context, 0x1A, 0);
     }
 }

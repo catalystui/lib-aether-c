@@ -67,7 +67,7 @@ jobs:
       - name: Run system identification verification
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          & "./build/linux/linux/${{ matrix.arch }}/release/test_catsylib"
+          & "./build/linux/linux/${{ matrix.arch }}/release/test_athidlib"
 
       - name: Compile public C headers
         run: |
@@ -112,10 +112,10 @@ jobs:
             -DTARGET_VENDOR=linux -DTARGET_SYSTEM=linux -DTARGET_ARCHITECTURE=${{ matrix.arch }} `
             -DCATALYST_AETHER_USE_INSTALLED_CORE=ON "-DCMAKE_PREFIX_PATH=$prefix"
           cmake --build target/ci-package --parallel
-          & "./$output/test_catsylib"
+          & "./$output/test_athidlib"
 
           # Link and run the existing verification program against shared Aether.
           # Its Core dependency must resolve from the installed package.
           g++ ${{ matrix.flags }} -std=c++${{ matrix.cpp }} -Iinclude -Itarget/ci-package/generated "-I$prefix/include" `
-            test/test_catsylib.cpp "-L$output/lib" -lcatsy '-Wl,-rpath,$ORIGIN' -o "$output/test_catsylib_shared"
-          & "./$output/test_catsylib_shared"
+            test/test_athidlib.cpp "-L$output/lib" -lathid '-Wl,-rpath,$ORIGIN' -o "$output/test_athidlib_shared"
+          & "./$output/test_athidlib_shared"

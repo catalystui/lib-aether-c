@@ -1,6 +1,6 @@
-#ifndef CATDVLIB_WIN32_HPP
-#define CATDVLIB_WIN32_HPP
-#include "catdvlib.h"
+#ifndef ATHDVLIB_WIN32_HPP
+#define ATHDVLIB_WIN32_HPP
+#include "athdvlib.h"
 #include "catalyst.hpp"
 #include "catmmlib.h"
 #include "cattelib.h"
@@ -13,7 +13,7 @@ extern "C" {
 #include <hidpi.h>
 }
 
-static inline catalyst::STATUS_CODE catdv_win_error(DWORD e) {
+static inline catalyst::STATUS_CODE athdv_win_error(DWORD e) {
     switch (e) {
         case ERROR_ACCESS_DENIED: case ERROR_SHARING_VIOLATION: return CATALYST_STATUS_CODE_ERROR_ACCESS_DENIED;
         case ERROR_FILE_NOT_FOUND: case ERROR_PATH_NOT_FOUND: case ERROR_DEVICE_NOT_CONNECTED: return CATALYST_STATUS_CODE_ERROR_NOT_FOUND;
@@ -26,7 +26,7 @@ static inline catalyst::STATUS_CODE catdv_win_error(DWORD e) {
 }
 
 /* Windows WCHAR is a native UTF-16 unit; translate explicitly through Core. */
-static inline catalyst::STATUS_CODE catdv_win_utf8(const WCHAR* value, catalyst::NUINT units, CATALYST_UTF8W output, catalyst::NUINT capacity) {
+static inline catalyst::STATUS_CODE athdv_win_utf8(const WCHAR* value, catalyst::NUINT units, CATALYST_UTF8W output, catalyst::NUINT capacity) {
     catalyst::NUINT used = 0;
     for (catalyst::NUINT j = 0; j < units && value[j];) {
         CATALYST_UTF16LE_CODE_UNIT u[2];
@@ -53,9 +53,9 @@ static inline catalyst::STATUS_CODE catdv_win_utf8(const WCHAR* value, catalyst:
     return used ? CATALYST_STATUS_CODE_SUCCESS : CATALYST_STATUS_CODE_ERROR_NOT_FOUND;
 }
 
-static inline catalyst::STATUS_CODE catdv_win_caps(HANDLE handle, HIDP_CAPS* caps) {
+static inline catalyst::STATUS_CODE athdv_win_caps(HANDLE handle, HIDP_CAPS* caps) {
     PHIDP_PREPARSED_DATA parsed = 0;
-    if (!HidD_GetPreparsedData(handle, &parsed)) return catdv_win_error(GetLastError());
+    if (!HidD_GetPreparsedData(handle, &parsed)) return athdv_win_error(GetLastError());
     NTSTATUS status = HidP_GetCaps(parsed, caps);
     if (!HidD_FreePreparsedData(parsed)) return CATALYST_STATUS_CODE_ERROR_IO_ERROR;
     return status == HIDP_STATUS_SUCCESS ? CATALYST_STATUS_CODE_SUCCESS : CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT;

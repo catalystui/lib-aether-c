@@ -41,24 +41,24 @@ endforeach()
 option(CATALYST_AETHER_BUILD_TESTS "Build Aether's standalone verification programs" ${PROJECT_IS_TOP_LEVEL})
 
 if(TARGET_PLATFORM_WIN32)
-    set(CATSYLIB_PLATFORM_SOURCE src/catsylib.win32.cpp)
+    set(ATHIDLIB_PLATFORM_SOURCE src/athidlib.win32.cpp)
 elseif(TARGET_PLATFORM_LINUX OR TARGET_PLATFORM_DARWIN)
-    set(CATSYLIB_PLATFORM_SOURCE src/catsylib.posix.cpp)
+    set(ATHIDLIB_PLATFORM_SOURCE src/athidlib.posix.cpp)
 else()
-    message(FATAL_ERROR "CATSYLIB has no implementation for this target platform.")
+    message(FATAL_ERROR "ATHIDLIB has no implementation for this target platform.")
 endif()
 
-add_library(catsylib_shared SHARED)
-add_library(catsylib_static STATIC)
+add_library(athidlib_shared SHARED)
+add_library(athidlib_static STATIC)
 configure_target(
-    NAME catsy
-    TARGETS catsylib_shared catsylib_static
+    NAME athid
+    TARGETS athidlib_shared athidlib_static
     SOURCES
-        src/catsylib.cpp
-        src/catsylib.internal.hpp
-        ${CATSYLIB_PLATFORM_SOURCE}
+        src/athidlib.cpp
+        src/athidlib.internal.hpp
+        ${ATHIDLIB_PLATFORM_SOURCE}
 )
-foreach(TARGET_NAME catsylib_shared catsylib_static)
+foreach(TARGET_NAME athidlib_shared athidlib_static)
     target_include_directories(${TARGET_NAME} PUBLIC
         "${PROJECT_SOURCE_DIR}/include"
     )
@@ -68,47 +68,47 @@ foreach(TARGET_NAME catsylib_shared catsylib_static)
         target_link_libraries(${TARGET_NAME} PRIVATE advapi32)
     endif()
 endforeach()
-target_compile_definitions(catsylib_shared PRIVATE CATSYLIB_EXPORTS INTERFACE CATSYLIB_USE_DLL)
-target_link_libraries(catsylib_static PRIVATE Catalyst::catmm_static Catalyst::catte_static)
-target_link_libraries(catsylib_shared PRIVATE Catalyst::catmm_shared Catalyst::catte_shared)
+target_compile_definitions(athidlib_shared PRIVATE ATHIDLIB_EXPORTS INTERFACE ATHIDLIB_USE_DLL)
+target_link_libraries(athidlib_static PRIVATE Catalyst::catmm_static Catalyst::catte_static)
+target_link_libraries(athidlib_shared PRIVATE Catalyst::catmm_shared Catalyst::catte_shared)
 
-add_library(Catalyst::catsy_static ALIAS catsylib_static)
-add_library(Catalyst::catsy_shared ALIAS catsylib_shared)
+add_library(Catalyst::athid_static ALIAS athidlib_static)
+add_library(Catalyst::athid_shared ALIAS athidlib_shared)
 
 # An installed Core may be outside Aether's runtime directory. Permit CMake
 # to resolve its shared library location during the build, retaining the
 # existing relative install RPATH for distribution.
 get_target_property(CORE_IMPORTED Catalyst::catmm_shared IMPORTED)
 if(CORE_IMPORTED AND (TARGET_PLATFORM_LINUX OR TARGET_PLATFORM_DARWIN))
-    set_target_properties(catsylib_shared PROPERTIES
+    set_target_properties(athidlib_shared PROPERTIES
         BUILD_WITH_INSTALL_RPATH FALSE
         BUILD_RPATH_USE_ORIGIN TRUE
     )
 endif()
 
-# Native device discovery consumes the same Core targets as CATSYLIB.
+# Native device discovery consumes the same Core targets as ATHIDLIB.
 if(TARGET_PLATFORM_LINUX)
-    set(MODULE_SOURCE "src/catdvlib.linux.cpp")
+    set(MODULE_SOURCE "src/athdvlib.linux.cpp")
 elseif(TARGET_PLATFORM_WIN32)
-    set(MODULE_SOURCE "src/catdvlib.win32.cpp")
+    set(MODULE_SOURCE "src/athdvlib.win32.cpp")
 elseif(TARGET_PLATFORM_DARWIN)
-    set(MODULE_SOURCE "src/catdvlib.darwin.cpp")
+    set(MODULE_SOURCE "src/athdvlib.darwin.cpp")
 else()
-    set(MODULE_SOURCE "src/catdvlib.cpp")
+    set(MODULE_SOURCE "src/athdvlib.cpp")
 endif()
 if(TARGET_PLATFORM_WIN32 OR TARGET_PLATFORM_DARWIN)
-    list(APPEND MODULE_SOURCE src/catdvlib.native.cpp)
+    list(APPEND MODULE_SOURCE src/athdvlib.native.cpp)
 endif()
-add_library(catdvlib_shared SHARED)
-add_library(catdvlib_static STATIC)
+add_library(athdvlib_shared SHARED)
+add_library(athdvlib_static STATIC)
 configure_target(
-    NAME catdv
-    TARGETS catdvlib_shared catdvlib_static
-    SOURCES ${MODULE_SOURCE} src/catdvlib.lookup.cpp
+    NAME athdv
+    TARGETS athdvlib_shared athdvlib_static
+    SOURCES ${MODULE_SOURCE} src/athdvlib.lookup.cpp
 )
-target_compile_definitions(catdvlib_shared PRIVATE CATDVLIB_EXPORTS INTERFACE CATDVLIB_USE_DLL)
+target_compile_definitions(athdvlib_shared PRIVATE ATHDVLIB_EXPORTS INTERFACE ATHDVLIB_USE_DLL)
 foreach(KIND shared static)
-    set(TARGET_NAME "catdvlib_${KIND}")
+    set(TARGET_NAME "athdvlib_${KIND}")
     target_include_directories(${TARGET_NAME} PUBLIC "${PROJECT_SOURCE_DIR}/include")
     target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
     target_link_libraries(${TARGET_NAME} PUBLIC Catalyst::catalyst)
@@ -120,10 +120,10 @@ foreach(KIND shared static)
     elseif(TARGET_PLATFORM_DARWIN)
         target_link_libraries(${TARGET_NAME} PRIVATE "-framework IOKit" "-framework CoreFoundation" "-framework CoreGraphics")
     endif()
-    add_library(Catalyst::catdv_${KIND} ALIAS ${TARGET_NAME})
+    add_library(Catalyst::athdv_${KIND} ALIAS ${TARGET_NAME})
 endforeach()
 if(CORE_IMPORTED AND (TARGET_PLATFORM_LINUX OR TARGET_PLATFORM_DARWIN))
-    set_target_properties(catdvlib_shared PROPERTIES
+    set_target_properties(athdvlib_shared PROPERTIES
         BUILD_WITH_INSTALL_RPATH FALSE
         BUILD_RPATH_USE_ORIGIN TRUE
     )
@@ -133,10 +133,10 @@ endif()
 if(CATALYST_AETHER_BUILD_TESTS)
     define_test_executables(
         STATIC_DEPENDS
-            catsylib_static
+            athidlib_static
         SHARED_DEPENDS
-            catsylib_shared
+            athidlib_shared
     )
-    target_link_libraries(test_catdvlib PRIVATE Catalyst::catdv_static)
-    target_link_libraries(perf_catdvlib PRIVATE Catalyst::catdv_static)
+    target_link_libraries(test_athdvlib PRIVATE Catalyst::athdv_static)
+    target_link_libraries(perf_athdvlib PRIVATE Catalyst::athdv_static)
 endif()

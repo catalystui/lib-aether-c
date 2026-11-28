@@ -37,18 +37,18 @@ Aether exposes capabilities that are system-specific or not available on every C
 <div style="flex:1 1 calc(50% - 0.5rem);min-width:min(100%, 15rem);box-sizing:border-box;padding:1.2rem;border:1px solid color-mix(in srgb, currentColor 19%, transparent);border-radius:12px;background:color-mix(in srgb, currentColor 3%, transparent);display:flex;flex-direction:column;align-items:center;text-align:center;">
 <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;width:32px;height:32px;margin:0.15rem auto 0.8rem;opacity:0.9;"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 9h10M7 13h6"/></svg>
 
-**[CATSYLIB](api-reference/catsylib/index.md)**
+**[ATHIDLIB](api-reference/athidlib/index.md)**
 
 <p style="margin:0 0 0.85rem;max-width:20rem;">Identify the operating system, distribution, architecture, and hostname.</p>
-<small style="opacity:0.8;margin-top:auto;">Link: <code>catsy</code></small>
+<small style="opacity:0.8;margin-top:auto;">Link: <code>athid</code></small>
 </div>
 <div style="flex:1 1 calc(50% - 0.5rem);min-width:min(100%, 15rem);box-sizing:border-box;padding:1.2rem;border:1px solid color-mix(in srgb, currentColor 19%, transparent);border-radius:12px;background:color-mix(in srgb, currentColor 3%, transparent);display:flex;flex-direction:column;align-items:center;text-align:center;">
 <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;width:32px;height:32px;margin:0.15rem auto 0.8rem;opacity:0.9;"><rect x="3" y="3" width="12" height="9" rx="1.5"/><path d="M9 12v3M6 15h6"/><rect x="16" y="10" width="5" height="11" rx="1"/><path d="M18 18h1"/></svg>
 
-**[CATDVLIB](api-reference/catdvlib/index.md)**
+**[ATHDVLIB](api-reference/athdvlib/index.md)**
 
 <p style="margin:0 0 0.85rem;max-width:20rem;">Discover native devices and displays, retrieve hardware and instance identifiers and EDID, and resolve native display handles.</p>
-<small style="opacity:0.8;margin-top:auto;">Link: <code>catdv</code></small>
+<small style="opacity:0.8;margin-top:auto;">Link: <code>athdv</code></small>
 </div>
 </div>
 
@@ -91,24 +91,24 @@ cmake --preset aclang17-darwin24.6-arm64 -DCATALYST_AETHER_USE_INSTALLED_CORE=ON
 
 Use a compatible target, build configuration, and toolchain. Existing parent-provided Core targets take precedence. Static Aether libraries link to static Core libraries; shared Aether libraries link to shared Core libraries. For distribution, deploy the required shared Core runtime files and ABI aliases alongside Aether's runtime files.
 
-Aether exposes `Catalyst::catsy_static`, `Catalyst::catsy_shared`, `Catalyst::catdv_static`, and `Catalyst::catdv_shared` to CMake source consumers. Its standalone verification programs are enabled by default only for top-level builds.
+Aether exposes `Catalyst::athid_static`, `Catalyst::athid_shared`, `Catalyst::athdv_static`, and `Catalyst::athdv_shared` to CMake source consumers. Its standalone verification programs are enabled by default only for top-level builds.
 
 ## Verification
 
 Run the standalone programs from the configured output directory, using Release for performance measurements:
 
 ```powershell
-./test_catsylib
-./test_catdvlib
-./perf_catsylib
-./perf_catdvlib
+./test_athidlib
+./test_athdvlib
+./perf_athidlib
+./perf_athdvlib
 ```
 
-CATSYLIB verification covers system identification and short-buffer preservation. CATDVLIB verifies snapshot ownership, metadata, exact instance lookup, display identification, available EDID bytes, and native display lookup. On Windows and macOS the test obtains the primary display handle independently from the OS. Use `test_catdvlib --verbose` for individual successful checks.
+ATHIDLIB verification covers system identification and short-buffer preservation. ATHDVLIB verifies snapshot ownership, metadata, exact instance lookup, display identification, available EDID bytes, and native display lookup. On Windows and macOS the test obtains the primary display handle independently from the OS. Use `test_athdvlib --verbose` for individual successful checks.
 
-Performance programs compare the public C API and C++ wrappers using CPU-time samples. CATSYLIB also measures its backend and independent native references where equivalent values are available; direct references omit some validation. CATDVLIB measures full enumeration, cached metadata and EDID retrieval, and instance and native handle lookups. Its direct Darwin HID discovery reference is narrower than full enumeration and is not an equivalent overhead baseline. Unavailable capabilities are reported separately from failures.
+Performance programs compare the public C API and C++ wrappers using CPU-time samples. ATHIDLIB also measures its backend and independent native references where equivalent values are available; direct references omit some validation. ATHDVLIB measures full enumeration, cached metadata and EDID retrieval, and instance and native handle lookups. Its direct Darwin HID discovery reference is narrower than full enumeration and is not an equivalent overhead baseline. Unavailable capabilities are reported separately from failures.
 
-The configured Linux CI builds pass. macOS ARM64 manual verification covers system identification and device discovery, including display identification and primary-display lookup (514 CATDVLIB checks passed, no failures). The internal display did not expose EDID through the current acquisition path. Successful EDID acquisition and Windows/Linux display hardware execution remain unverified.
+The configured Linux CI builds pass. macOS ARM64 manual verification covers system identification and device discovery, including display identification and primary-display lookup (514 ATHDVLIB checks passed, no failures). The internal display did not expose EDID through the current acquisition path. Successful EDID acquisition and Windows/Linux display hardware execution remain unverified.
 
 ## AI-Assisted Development
 

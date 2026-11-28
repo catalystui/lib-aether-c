@@ -10,48 +10,48 @@
 #undef TRUE
 #undef FALSE
 
-typedef CATALYST_RESULT (*TextQuery)(const CATDVLIB_DEVICE*, CATALYST_UTF8*);
-typedef catalyst::RESULT (*TextQueryCpp)(const CATDVLIB_DEVICE*, catalyst::UTF8*);
+typedef CATALYST_RESULT (*TextQuery)(const ATHDVLIB_DEVICE*, CATALYST_UTF8*);
+typedef catalyst::RESULT (*TextQueryCpp)(const ATHDVLIB_DEVICE*, catalyst::UTF8*);
 struct TextCase { const char* name; catalyst::BYTE context; TextQuery c; TextQueryCpp cpp; };
 static const TextCase textCases[] = {
-    {"serial", 0x09, catdv_device_get_serial, catalyst::device::device_get_serial},
-    {"manufacturer", 0x0A, catdv_device_get_manufacturer, catalyst::device::device_get_manufacturer},
-    {"product", 0x0B, catdv_device_get_product, catalyst::device::device_get_product},
-    {"descriptor", 0x0C, catdv_device_get_descriptor, catalyst::device::device_get_descriptor},
-    {"revision", 0x0D, catdv_device_get_revision, catalyst::device::device_get_revision}
+    {"serial", 0x09, athdv_device_get_serial, catalyst::device::device_get_serial},
+    {"manufacturer", 0x0A, athdv_device_get_manufacturer, catalyst::device::device_get_manufacturer},
+    {"product", 0x0B, athdv_device_get_product, catalyst::device::device_get_product},
+    {"descriptor", 0x0C, athdv_device_get_descriptor, catalyst::device::device_get_descriptor},
+    {"revision", 0x0D, athdv_device_get_revision, catalyst::device::device_get_revision}
 };
 
 int main(int argc, char** argv) {
     bool verbose = take_verbose(&argc, &argv);
-    if (argc != 1) { std::printf("Usage: test_catdvlib [--verbose]\n"); return 1; }
-    std::printf("CATDVLIB Tests\nTarget: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
+    if (argc != 1) { std::printf("Usage: test_athdvlib [--verbose]\n"); return 1; }
+    std::printf("ATHDVLIB Tests\nTarget: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
     TestReport report(verbose);
-    CATDVLIB_DEVICES* snapshot = test_snapshot(&report);
+    ATHDVLIB_DEVICES* snapshot = test_snapshot(&report);
     if (!snapshot) return report.finish();
-    catalyst::NUINT count = catdv_devices_get_count(snapshot);
+    catalyst::NUINT count = athdv_devices_get_count(snapshot);
     report.check(count == catalyst::device::devices_get_count(snapshot), "C/C++ snapshot count");
     std::printf("Devices: %lu\n", (unsigned long) count);
     if (!count) report.skip("no devices discovered");
     for (catalyst::NUINT j = 0; j < count; ++j) {
-        const CATDVLIB_DEVICE* d = catdv_devices_get(snapshot, j);
+        const ATHDVLIB_DEVICE* d = athdv_devices_get(snapshot, j);
         print_device(j, d);
         TestReport before = report;
         report.check(d && d == catalyst::device::devices_get(snapshot, j), "borrowed device / C++ parity");
         if (!d) { report.summary(before); continue; }
-        CATDVLIB_DEVICE_TYPE type = catdv_device_get_type(d);
-        report.check(type <= CATDVLIB_DEVICE_LOGICAL && type == catalyst::device::device_get_type(d), "device type");
-        CATDVLIB_IDENTIFIER id = {0, 0}, other = {0, 0};
-        catalyst::RESULT r = catdv_device_get_identifier(d, &id), c = catalyst::device::device_get_identifier(d, &other);
+        ATHDVLIB_DEVICE_TYPE type = athdv_device_get_type(d);
+        report.check(type <= ATHDVLIB_DEVICE_LOGICAL && type == catalyst::device::device_get_type(d), "device type");
+        ATHDVLIB_IDENTIFIER id = {0, 0}, other = {0, 0};
+        catalyst::RESULT r = athdv_device_get_identifier(d, &id), c = catalyst::device::device_get_identifier(d, &other);
         if (report.result("instance identifier", r, 0x06))
             report.check(same_identifier(id, other) && same_result(r, c), "identifier C/C++ parity");
         else report.check(!id.scheme && !id.value, "identifier failure outputs");
         catalyst::NUINT ids = 0, cppIds = 0;
-        r = catdv_device_get_hwid_count(d, &ids); c = catalyst::device::device_get_hwid_count(d, &cppIds);
+        r = athdv_device_get_hwid_count(d, &ids); c = catalyst::device::device_get_hwid_count(d, &cppIds);
         if (report.result("HWID count", r, 0x07)) {
             report.check(ids == cppIds && same_result(r, c), "HWID count parity");
             for (catalyst::NUINT k = 0; k < ids; ++k) {
-                CATDVLIB_IDENTIFIER hw = {0, 0}, cppHw = {0, 0};
-                r = catdv_device_get_hwid(d, k, &hw); c = catalyst::device::device_get_hwid(d, k, &cppHw);
+                ATHDVLIB_IDENTIFIER hw = {0, 0}, cppHw = {0, 0};
+                r = athdv_device_get_hwid(d, k, &hw); c = catalyst::device::device_get_hwid(d, k, &cppHw);
                 if (report.result("HWID", r, 0x08)) {
                     report.check(same_identifier(hw, cppHw) && same_result(r, c), "HWID parity");
                     if (valid_identifier(hw)) std::printf("      [%s] %s\n", (const char*) hw.scheme, (const char*) hw.value);
@@ -68,32 +68,32 @@ int main(int argc, char** argv) {
             else report.check(!value && !cpp, "metadata failure outputs");
         }
         catalyst::BOOL supported = catalyst::FALSE, cppSupported = catalyst::FALSE;
-        r = catdv_device_has_input(d, &supported); c = catalyst::device::device_has_input(d, &cppSupported);
+        r = athdv_device_has_input(d, &supported); c = catalyst::device::device_has_input(d, &cppSupported);
         if (report.result("input capability", r, 0x0E))
             report.check(same_result(r, c) && supported == cppSupported, "input capability parity");
         else report.check(!supported, "input failure output");
         supported = cppSupported = catalyst::FALSE;
-        r = catdv_device_has_output(d, &supported); c = catalyst::device::device_has_output(d, &cppSupported);
+        r = athdv_device_has_output(d, &supported); c = catalyst::device::device_has_output(d, &cppSupported);
         if (report.result("output capability", r, 0x0F))
             report.check(same_result(r, c) && supported == cppSupported, "output capability parity");
         else report.check(!supported, "output failure output");
         // Instance lookup must identify this exact borrowed record.
-        CATDVLIB_IDENTIFIER lookupId = {0, 0};
-        if (catdv_device_get_identifier(d, &lookupId).status == catalyst::STATUS_CODE_SUCCESS) {
-            const CATDVLIB_DEVICE* match = 0;
-            catalyst::RESULT found = catdv_devices_find_identifier(snapshot, &lookupId, &match);
-            const CATDVLIB_DEVICE* cppMatch = 0;
+        ATHDVLIB_IDENTIFIER lookupId = {0, 0};
+        if (athdv_device_get_identifier(d, &lookupId).status == catalyst::STATUS_CODE_SUCCESS) {
+            const ATHDVLIB_DEVICE* match = 0;
+            catalyst::RESULT found = athdv_devices_find_identifier(snapshot, &lookupId, &match);
+            const ATHDVLIB_DEVICE* cppMatch = 0;
             catalyst::RESULT cppFound = catalyst::device::devices_find_identifier(snapshot, &lookupId, &cppMatch);
             report.check(same_result(found, cppFound) && match == cppMatch, "identifier lookup parity");
             if (report.result("instance lookup", found, 0x12)) report.check(match == d, "instance lookup identity");
         }
-        catalyst::BOOL display = catdv_device_is_display(d);
+        catalyst::BOOL display = athdv_device_is_display(d);
         report.check(display == catalyst::device::device_is_display(d), "display classification parity");
         if (display) {
             std::printf("  Display endpoint\n");
             const CATALYST_BYTE* bytes = 0, *cppBytes = 0;
             catalyst::NUINT size = 0, cppSize = 0;
-            catalyst::RESULT er = catdv_display_get_edid(d, &bytes, &size);
+            catalyst::RESULT er = athdv_display_get_edid(d, &bytes, &size);
             catalyst::RESULT ec = catalyst::device::display_get_edid(d, &cppBytes, &cppSize);
             report.check(same_result(er, ec) && bytes == cppBytes && size == cppSize, "EDID parity");
             if (er.status == catalyst::STATUS_CODE_ERROR_INVALID_STATE) report.skip("ambiguous EDID association");
@@ -103,13 +103,13 @@ int main(int argc, char** argv) {
             }
             if (er.status != catalyst::STATUS_CODE_SUCCESS) report.check(!bytes && !size, "EDID failure outputs");
             catalyst::NUINT handle = 0, cppHandle = 0;
-            catalyst::RESULT hr = catdv_display_get_native_handle(d, &handle);
+            catalyst::RESULT hr = athdv_display_get_native_handle(d, &handle);
             catalyst::RESULT hc = catalyst::device::display_get_native_handle(d, &cppHandle);
             report.check(same_result(hr, hc) && handle == cppHandle, "native handle parity");
             if (report.result("native display handle", hr, 0x11)) {
-                const CATDVLIB_DEVICE* match = 0;
-                catalyst::RESULT found = catdv_devices_find_native_display(snapshot, handle, &match);
-                const CATDVLIB_DEVICE* cppMatch = 0;
+                const ATHDVLIB_DEVICE* match = 0;
+                catalyst::RESULT found = athdv_devices_find_native_display(snapshot, handle, &match);
+                const ATHDVLIB_DEVICE* cppMatch = 0;
                 catalyst::RESULT cppFound = catalyst::device::devices_find_native_display(snapshot, handle, &cppMatch);
                 report.check(same_result(found, cppFound) && match == cppMatch, "native display lookup parity");
                 if (found.status == catalyst::STATUS_CODE_ERROR_INVALID_STATE) {
@@ -132,37 +132,37 @@ int main(int argc, char** argv) {
     nativePrimary = (catalyst::NUINT) MonitorFromPoint(origin, MONITOR_DEFAULTTOPRIMARY);
 #endif
     if (nativePrimary) {
-        const CATDVLIB_DEVICE* primary = 0;
-        catalyst::RESULT pr = catdv_devices_find_native_display(snapshot, nativePrimary, &primary);
+        const ATHDVLIB_DEVICE* primary = 0;
+        catalyst::RESULT pr = athdv_devices_find_native_display(snapshot, nativePrimary, &primary);
         if (pr.status == catalyst::STATUS_CODE_ERROR_INVALID_STATE) {
             report.check(!primary && pr.context == 0x13 && pr.operation == 0x02 && !pr.detail, "ambiguous native primary result");
             report.skip("native primary display maps to several endpoints");
         } else {
             report.check(pr.status == catalyst::STATUS_CODE_SUCCESS && pr.context == 0x13 &&
-                pr.operation == 0x04 && !pr.detail && primary && catdv_device_is_display(primary), "independent native primary display lookup");
+                pr.operation == 0x04 && !pr.detail && primary && athdv_device_is_display(primary), "independent native primary display lookup");
             if (primary) {
                 catalyst::NUINT roundTrip = 0;
-                catalyst::RESULT hr = catdv_display_get_native_handle(primary, &roundTrip);
+                catalyst::RESULT hr = athdv_display_get_native_handle(primary, &roundTrip);
                 report.check(hr.status == catalyst::STATUS_CODE_SUCCESS && roundTrip == nativePrimary, "native primary handle identity");
                 std::printf("Native primary display resolved successfully.\n");
             }
         }
     } else report.skip("no native primary display");
 #else
-    const CATDVLIB_DEVICE* unsupported = 0;
-    catalyst::RESULT nr = catdv_devices_find_native_display(snapshot, 0, &unsupported);
+    const ATHDVLIB_DEVICE* unsupported = 0;
+    catalyst::RESULT nr = athdv_devices_find_native_display(snapshot, 0, &unsupported);
     report.check(nr.status == catalyst::STATUS_CODE_ERROR_NOT_IMPLEMENTED && nr.context == 0x13 &&
         nr.operation == 0x05 && !nr.detail && !unsupported, "unsupported numeric native display lookup");
 #endif
-    CATDVLIB_IDENTIFIER absent = { (CATALYST_ASCII) "test-absent-scheme", (CATALYST_UTF8) "absent" };
-    const CATDVLIB_DEVICE* missing = 0;
-    catalyst::RESULT notFound = catdv_devices_find_identifier(snapshot, &absent, &missing);
+    ATHDVLIB_IDENTIFIER absent = { (CATALYST_ASCII) "test-absent-scheme", (CATALYST_UTF8) "absent" };
+    const ATHDVLIB_DEVICE* missing = 0;
+    catalyst::RESULT notFound = athdv_devices_find_identifier(snapshot, &absent, &missing);
     report.check(notFound.status == catalyst::STATUS_CODE_ERROR_NOT_FOUND && notFound.context == 0x12 &&
         notFound.operation == 0x03 && !notFound.detail && !missing, "missing instance lookup");
     report.result("free snapshot", catalyst::device::devices_free(snapshot), 0x02);
     snapshot = 0;
     catalyst::RESULT r = catalyst::device::devices_enumerate(&snapshot);
-    if (report.result("C++ re-enumeration", r, 0x01)) report.result("C free", catdv_devices_free(snapshot), 0x02);
+    if (report.result("C++ re-enumeration", r, 0x01)) report.result("C free", athdv_devices_free(snapshot), 0x02);
     else report.check(snapshot == 0, "re-enumeration failure output");
     return report.finish();
 }

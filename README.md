@@ -29,8 +29,8 @@ Aether aims to make native system-level bindings and operating system services a
 
 | Library | Headers | Purpose |
 | --- | --- | --- |
-| [CATSYLIB](docs/lang/en-US/api-reference/catsylib/index.md) | `catsylib.h`, `catsylib.hpp` | Operating system, distribution, architecture, and hostname identification. |
-| [CATDVLIB](docs/lang/en-US/api-reference/catdvlib/index.md) | `catdvlib.h`, `catdvlib.hpp` | Device discovery, hardware and instance identifiers, metadata, capability discovery, display identification, EDID acquisition, and native display lookup. |
+| [ATHIDLIB](docs/lang/en-US/api-reference/athidlib/index.md) | `athidlib.h`, `athidlib.hpp` | Operating system, distribution, architecture, and hostname identification. |
+| [ATHDVLIB](docs/lang/en-US/api-reference/athdvlib/index.md) | `athdvlib.h`, `athdvlib.hpp` | Device discovery, hardware and instance identifiers, metadata, capability discovery, display identification, EDID acquisition, and native display lookup. |
 
 Display discovery uses Win32 monitor interfaces, CoreGraphics display IDs, or Linux DRM connectors. EDID availability depends on the native system; Aether returns the bytes supplied by the OS without interpreting or synthesizing them. Numeric native display handles are supported on Windows and macOS; Linux connectors use exact instance identifiers.
 
@@ -63,17 +63,17 @@ cmake --build --preset aclang17-darwin24.6-arm64-release
 
 Aether uses Core's exported CMake targets, retrieving a pinned Core revision automatically when no parent-provided targets are available. An installed Core package can also be selected explicitly; see the documentation for configuration details.
 
-Source consumers can link `Catalyst::catsy_static`, `Catalyst::catsy_shared`, `Catalyst::catdv_static`, or `Catalyst::catdv_shared`. Preset availability depends on the installed toolchain.
+Source consumers can link `Catalyst::athid_static`, `Catalyst::athid_shared`, `Catalyst::athdv_static`, or `Catalyst::athdv_shared`. Preset availability depends on the installed toolchain.
 
 ## Verification
 
 Standalone verification and performance programs are enabled by default for top-level builds. From the configured Release output directory, run:
 
 ```powershell
-./test_catsylib
-./test_catdvlib
-./perf_catsylib
-./perf_catdvlib
+./test_athidlib
+./test_athdvlib
+./perf_athidlib
+./perf_athdvlib
 ```
 
 System identification, HID discovery, display identification, and independent primary-display handle lookup have been exercised on macOS ARM64. The internal display's EDID was unavailable through the current public IOKit path. Successful EDID retrieval and Windows/Linux display hardware execution still require verification. Missing native properties are reported separately from failures.

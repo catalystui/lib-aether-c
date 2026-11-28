@@ -1,11 +1,11 @@
-# CATSYLIB
+# ATHIDLIB
 
 Provides native system identification.
 
-**C Header:** `catsylib.h`  
-**C++ Header:** `catsylib.hpp`  
+**C Header:** `athidlib.h`  
+**C++ Header:** `athidlib.hpp`  
 **Namespace:** `catalyst`  
-**Library:** `catsy`  
+**Library:** `athid`  
 **Dependencies:** CATALYST, CATMMLIB, CATTELIB; Windows system and registry APIs, or POSIX system APIs.  
 **Specification:** [FDEFSPEC](https://catalystui.org/specifications/languages/fdefspec/)
 
@@ -21,29 +21,29 @@ For Aether-wide requirements, see [Assumptions](../../assumptions/index.md).
 
 | Macro | Meaning |
 | --- | --- |
-| [CATSYLIB_API](#catsylib_api) | Native export/import annotation. |
+| [ATHIDLIB_API](#athidlib_api) | Native export/import annotation. |
 
 | Function | Behavior |
 | --- | --- |
-| [catsy_system_get_name](#catsy_system_get_name) | Retrieve operating system name. |
-| [catsy_system_get_version](#catsy_system_get_version) | Retrieve operating system version. |
-| [catsy_system_get_distribution](#catsy_system_get_distribution) | Retrieve operating system distribution name. |
-| [catsy_system_get_distribution_version](#catsy_system_get_distribution_version) | Retrieve operating system distribution version. |
-| [catsy_system_get_architecture](#catsy_system_get_architecture) | Retrieve native system architecture. |
-| [catsy_system_get_hostname](#catsy_system_get_hostname) | Retrieve system hostname. |
+| [athid_system_get_name](#athid_system_get_name) | Retrieve operating system name. |
+| [athid_system_get_version](#athid_system_get_version) | Retrieve operating system version. |
+| [athid_system_get_distribution](#athid_system_get_distribution) | Retrieve operating system distribution name. |
+| [athid_system_get_distribution_version](#athid_system_get_distribution_version) | Retrieve operating system distribution version. |
+| [athid_system_get_architecture](#athid_system_get_architecture) | Retrieve native system architecture. |
+| [athid_system_get_hostname](#athid_system_get_hostname) | Retrieve system hostname. |
 
 ## Macros
 
-### CATSYLIB_API
+### ATHIDLIB_API
 
-Export/import annotation for CATSYLIB's C ABI. On Windows, `CATSYLIB_EXPORTS` selects `__declspec(dllexport)` and `CATSYLIB_USE_DLL` selects `__declspec(dllimport)`; otherwise the macro is empty. Static linking and non-Windows builds use an empty annotation.
+Export/import annotation for ATHIDLIB's C ABI. On Windows, `ATHIDLIB_EXPORTS` selects `__declspec(dllexport)` and `ATHIDLIB_USE_DLL` selects `__declspec(dllimport)`; otherwise the macro is empty. Static linking and non-Windows builds use an empty annotation.
 
 ## Functions
 
-### catsy_system_get_name
+### athid_system_get_name
 
 ```c
-CATALYST_RESULT catsy_system_get_name(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required);
+CATALYST_RESULT athid_system_get_name(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required);
 ```
 
 Retrieve the operating system name. Windows reports `Windows NT`; POSIX uses `uname().sysname`.
@@ -81,12 +81,12 @@ Retrieve the operating system name. Windows reports `Windows NT`; POSIX uses `un
 | `0x00014200` | `SUCCESS` | Copy output (Windows) | — |
 | `0x90014300` | `ERROR_BUFFER_OVERFLOW`: insufficient capacity; required returned | Check capacity (Windows) | — |
 
-**See Also:** [catsy_system_get_version](#catsy_system_get_version)
+**See Also:** [athid_system_get_version](#athid_system_get_version)
 
-### catsy_system_get_version
+### athid_system_get_version
 
 ```c
-CATALYST_RESULT catsy_system_get_version(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required);
+CATALYST_RESULT athid_system_get_version(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required);
 ```
 
 Retrieve the operating system version. Windows retrieves the running NT major, minor and build numbers. POSIX uses `uname().release`.
@@ -131,12 +131,12 @@ Retrieve the operating system version. Windows retrieves the running NT major, m
 | `0x91025000` | `ERROR_ALLOCATION_FAILED` | Query NT version (Windows) | — |
 | `0xA0025000` | `ERROR_IO_ERROR` | Query NT version (Windows) | — |
 
-**See Also:** [catsy_system_get_distribution_version](#catsy_system_get_distribution_version)
+**See Also:** [athid_system_get_distribution_version](#athid_system_get_distribution_version)
 
-### catsy_system_get_distribution
+### athid_system_get_distribution
 
 ```c
-CATALYST_RESULT catsy_system_get_distribution(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required);
+CATALYST_RESULT athid_system_get_distribution(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required);
 ```
 
 Retrieve the operating system distribution name. Windows uses `ProductName` (correcting the Windows 10 compatibility name on known Windows 11 workstation builds); macOS reports `macOS`; Linux reads `NAME` from `/etc/os-release` or `/usr/lib/os-release` if absent.
@@ -227,12 +227,12 @@ Retrieve the operating system distribution name. Windows uses `ProductName` (cor
 | `0x83035F00` | `ERROR_MALFORMED_INPUT`: embedded terminator | Validate registry terminator (Windows) | — |
 | `0x82036000` | `ERROR_INVALID_STATE` | Release registry storage (Windows) | — |
 
-**See Also:** [catsy_system_get_distribution_version](#catsy_system_get_distribution_version)
+**See Also:** [athid_system_get_distribution_version](#athid_system_get_distribution_version)
 
-### catsy_system_get_distribution_version
+### athid_system_get_distribution_version
 
 ```c
-CATALYST_RESULT catsy_system_get_distribution_version(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required);
+CATALYST_RESULT athid_system_get_distribution_version(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required);
 ```
 
 Retrieve the operating system distribution version. Windows uses `DisplayVersion` with `ReleaseId` fallback; macOS uses `kern.osproductversion`; Linux reads `VERSION_ID`. A rolling distribution may omit this field.
@@ -349,12 +349,12 @@ Retrieve the operating system distribution version. Windows uses `DisplayVersion
 | `0x83045F00` | `ERROR_MALFORMED_INPUT`: embedded terminator | Validate registry terminator (Windows) | — |
 | `0x82046000` | `ERROR_INVALID_STATE` | Release registry storage (Windows) | — |
 
-**See Also:** [catsy_system_get_distribution](#catsy_system_get_distribution)
+**See Also:** [athid_system_get_distribution](#athid_system_get_distribution)
 
-### catsy_system_get_architecture
+### athid_system_get_architecture
 
 ```c
-CATALYST_RESULT catsy_system_get_architecture(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required);
+CATALYST_RESULT athid_system_get_architecture(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required);
 ```
 
 Retrieve the native system architecture. Common aliases are normalized to `x86`, `x86_64`, and `arm64`. Other POSIX names are retained.
@@ -405,12 +405,12 @@ Retrieve the native system architecture. Common aliases are normalized to `x86`,
 | `0x91055D00` | `ERROR_ALLOCATION_FAILED` | Query architecture (Windows) | — |
 | `0xA0055D00` | `ERROR_IO_ERROR` | Query architecture (Windows) | — |
 
-**See Also:** [catsy_system_get_name](#catsy_system_get_name)
+**See Also:** [athid_system_get_name](#athid_system_get_name)
 
-### catsy_system_get_hostname
+### athid_system_get_hostname
 
 ```c
-CATALYST_RESULT catsy_system_get_hostname(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required);
+CATALYST_RESULT athid_system_get_hostname(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required);
 ```
 
 Retrieve the system hostname. Windows retrieves the DNS hostname; POSIX retrieves the UTS node name.
@@ -475,4 +475,4 @@ Retrieve the system hostname. Windows retrieves the DNS hostname; POSIX retrieve
 | `0x83066400` | `ERROR_MALFORMED_INPUT`: embedded zero | Validate stack hostname (Windows) | — |
 | `0x83066500` | `ERROR_MALFORMED_INPUT`: embedded zero | Validate allocated hostname (Windows) | — |
 
-**See Also:** [catsy_system_get_name](#catsy_system_get_name)
+**See Also:** [athid_system_get_name](#athid_system_get_name)

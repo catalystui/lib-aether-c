@@ -1,11 +1,11 @@
-#include "catdvlib.native.hpp"
-#include "catdvlib.darwin.hpp"
+#include "athdvlib.native.hpp"
+#include "athdvlib.darwin.hpp"
 #include <CoreGraphics/CoreGraphics.h>
 #include <IOKit/graphics/IOGraphicsLib.h>
 #undef TRUE
 #undef FALSE
 
-static void catdv_mac_text(IOHIDDeviceRef hid, CFStringRef key, CATDVLIB_NATIVE_TEXT* text) {
+static void athdv_mac_text(IOHIDDeviceRef hid, CFStringRef key, ATHDVLIB_NATIVE_TEXT* text) {
     CFTypeRef value = IOHIDDeviceGetProperty(hid, key);
     if (!value) return;
     if (CFGetTypeID(value) != CFStringGetTypeID()) { text->status = catalyst::STATUS_CODE_ERROR_MALFORMED_INPUT; return; }
@@ -16,7 +16,7 @@ static void catdv_mac_text(IOHIDDeviceRef hid, CFStringRef key, CATDVLIB_NATIVE_
     catalyst::RESULT r = catte_utf8_length(text->value, &length);
     text->status = catalyst::status_code_is_success(r.status) && length == 0 ? catalyst::STATUS_CODE_ERROR_NOT_FOUND : r.status;
 }
-static catalyst::STATUS_CODE catdv_mac_number(IOHIDDeviceRef hid, CFStringRef key, CATALYST_ULONG* number) {
+static catalyst::STATUS_CODE athdv_mac_number(IOHIDDeviceRef hid, CFStringRef key, CATALYST_ULONG* number) {
     CFTypeRef value = IOHIDDeviceGetProperty(hid, key);
     if (!value) return catalyst::STATUS_CODE_ERROR_NOT_FOUND;
     SInt64 n;
@@ -24,25 +24,25 @@ static catalyst::STATUS_CODE catdv_mac_number(IOHIDDeviceRef hid, CFStringRef ke
         return catalyst::STATUS_CODE_ERROR_MALFORMED_INPUT;
     *number = (CATALYST_ULONG) n; return catalyst::STATUS_CODE_SUCCESS;
 }
-static catalyst::STATUS_CODE catdv_mac_entry(CATDVLIB_DEVICES* devices, IOHIDDeviceRef hid) {
+static catalyst::STATUS_CODE athdv_mac_entry(ATHDVLIB_DEVICES* devices, IOHIDDeviceRef hid) {
     uint64_t native_id;
     io_service_t service = IOHIDDeviceGetService(hid);
     if (!service) return catalyst::STATUS_CODE_SUCCESS;
     kern_return_t err = IORegistryEntryGetRegistryEntryID(service, &native_id);
-    if (err != KERN_SUCCESS) return catdv_mac_status(err);
-    CATDVLIB_DEVICE* d;
-    catalyst::RESULT r = catdv_native_add(devices, &d);
+    if (err != KERN_SUCCESS) return athdv_mac_status(err);
+    ATHDVLIB_DEVICE* d;
+    catalyst::RESULT r = athdv_native_add(devices, &d);
     if (!catalyst::status_code_is_success(r.status)) return r.status;
-    d->scheme = (CATALYST_ASCII) "darwin-hid"; d->type = CATDVLIB_DEVICE_LOGICAL;
-    catdv_mac_hex(d->identifier.value, (CATALYST_ULONG) native_id, 16);
+    d->scheme = (CATALYST_ASCII) "darwin-hid"; d->type = ATHDVLIB_DEVICE_LOGICAL;
+    athdv_mac_hex(d->identifier.value, (CATALYST_ULONG) native_id, 16);
     d->identifier.status = catalyst::STATUS_CODE_SUCCESS;
-    catdv_mac_text(hid, CFSTR(kIOHIDManufacturerKey), &d->manufacturer);
-    catdv_mac_text(hid, CFSTR(kIOHIDProductKey), &d->product);
-    catdv_mac_text(hid, CFSTR(kIOHIDSerialNumberKey), &d->serial);
+    athdv_mac_text(hid, CFSTR(kIOHIDManufacturerKey), &d->manufacturer);
+    athdv_mac_text(hid, CFSTR(kIOHIDProductKey), &d->product);
+    athdv_mac_text(hid, CFSTR(kIOHIDSerialNumberKey), &d->serial);
     d->descriptor = d->product;
     CATALYST_ULONG vendor, product, revision;
-    catalyst::STATUS_CODE vs = catdv_mac_number(hid, CFSTR(kIOHIDVendorIDKey), &vendor);
-    catalyst::STATUS_CODE ps = catdv_mac_number(hid, CFSTR(kIOHIDProductIDKey), &product);
+    catalyst::STATUS_CODE vs = athdv_mac_number(hid, CFSTR(kIOHIDVendorIDKey), &vendor);
+    catalyst::STATUS_CODE ps = athdv_mac_number(hid, CFSTR(kIOHIDProductIDKey), &product);
     if (vs == catalyst::STATUS_CODE_SUCCESS && ps == catalyst::STATUS_CODE_SUCCESS) {
         if (vendor > 65535 || product > 65535) d->hwid_status = catalyst::STATUS_CODE_ERROR_MALFORMED_INPUT;
         else {
@@ -51,22 +51,22 @@ static catalyst::STATUS_CODE catdv_mac_entry(CATDVLIB_DEVICES* devices, IOHIDDev
             if (transport && CFGetTypeID(transport) == CFStringGetTypeID() &&
                 CFStringCompare((CFStringRef) transport, CFSTR("USB"), 0) == kCFCompareEqualTo)
                 d->hwid_scheme = (CATALYST_ASCII) "usb";
-            catdv_mac_hex(d->hwids[0].value, vendor, 4);
+            athdv_mac_hex(d->hwids[0].value, vendor, 4);
             d->hwids[0].value[4] = ':';
-            catdv_mac_hex(d->hwids[0].value + 5, product, 4);
+            athdv_mac_hex(d->hwids[0].value + 5, product, 4);
             d->hwids[0].status = catalyst::STATUS_CODE_SUCCESS; d->hwid_count = 1;
         }
     } else if (vs != catalyst::STATUS_CODE_SUCCESS && vs != catalyst::STATUS_CODE_ERROR_NOT_FOUND) d->hwid_status = vs;
     else if (ps != catalyst::STATUS_CODE_SUCCESS && ps != catalyst::STATUS_CODE_ERROR_NOT_FOUND) d->hwid_status = ps;
-    d->revision.status = catdv_mac_number(hid, CFSTR(kIOHIDVersionNumberKey), &revision);
-    if (d->revision.status == catalyst::STATUS_CODE_SUCCESS) catdv_mac_hex(d->revision.value, revision, 16);
+    d->revision.status = athdv_mac_number(hid, CFSTR(kIOHIDVersionNumberKey), &revision);
+    if (d->revision.status == catalyst::STATUS_CODE_SUCCESS) athdv_mac_hex(d->revision.value, revision, 16);
     CFArrayRef elements = IOHIDDeviceCopyMatchingElements(hid, 0, kIOHIDOptionsTypeNone);
     if (elements) {
         d->capability_status = catalyst::STATUS_CODE_SUCCESS;
         for (CFIndex j = 0; j < CFArrayGetCount(elements); ++j) {
             IOHIDElementRef element = (IOHIDElementRef) CFArrayGetValueAtIndex(elements, j);
-            if (catdv_mac_direction(element, catalyst::TRUE)) d->input = catalyst::TRUE;
-            if (catdv_mac_direction(element, catalyst::FALSE)) d->output = catalyst::TRUE;
+            if (athdv_mac_direction(element, catalyst::TRUE)) d->input = catalyst::TRUE;
+            if (athdv_mac_direction(element, catalyst::FALSE)) d->output = catalyst::TRUE;
             if (d->input && d->output) break;
         }
         CFRelease(elements);
@@ -75,7 +75,7 @@ static catalyst::STATUS_CODE catdv_mac_entry(CATDVLIB_DEVICES* devices, IOHIDDev
 }
 /* Use public CoreGraphics identities and public IOKit display properties.
  * A vendor/product match alone must not select one of several identical panels. */
-static bool catdv_mac_display_number(CFDictionaryRef info, CFStringRef key, uint32_t* value) {
+static bool athdv_mac_display_number(CFDictionaryRef info, CFStringRef key, uint32_t* value) {
     CFTypeRef field = CFDictionaryGetValue(info, key);
     SInt64 n = 0;
     if (!field || CFGetTypeID(field) != CFNumberGetTypeID() ||
@@ -84,7 +84,7 @@ static bool catdv_mac_display_number(CFDictionaryRef info, CFStringRef key, uint
     return true;
 }
 
-static void catdv_mac_display_edid(CATDVLIB_DEVICE* d, CGDirectDisplayID id, const CGDirectDisplayID* ids, uint32_t count) {
+static void athdv_mac_display_edid(ATHDVLIB_DEVICE* d, CGDirectDisplayID id, const CGDirectDisplayID* ids, uint32_t count) {
     uint32_t vendor = CGDisplayVendorNumber(id), product = CGDisplayModelNumber(id), serial = CGDisplaySerialNumber(id);
     if (!vendor) return;
     for (uint32_t j = 0; j < count; ++j) {
@@ -97,7 +97,7 @@ static void catdv_mac_display_edid(CATDVLIB_DEVICE* d, CGDirectDisplayID id, con
     if (!matching) { d->display.edid_status = CATALYST_STATUS_CODE_ERROR_ALLOCATION_FAILED; return; }
     io_iterator_t iterator = 0;
     kern_return_t result = IOServiceGetMatchingServices(kIOMasterPortDefault, matching, &iterator);
-    if (result != KERN_SUCCESS) { d->display.edid_status = catdv_mac_status(result); return; }
+    if (result != KERN_SUCCESS) { d->display.edid_status = athdv_mac_status(result); return; }
     CFDictionaryRef match = 0;
     io_service_t service;
     bool ambiguous = false;
@@ -106,9 +106,9 @@ static void catdv_mac_display_edid(CATDVLIB_DEVICE* d, CGDirectDisplayID id, con
         IOObjectRelease(service);
         if (!info) continue;
         uint32_t v = 0, p = 0, s = 0;
-        bool equal = catdv_mac_display_number(info, CFSTR("DisplayVendorID"), &v) &&
-            catdv_mac_display_number(info, CFSTR("DisplayProductID"), &p) && v == vendor && p == product &&
-            (!serial || (catdv_mac_display_number(info, CFSTR("DisplaySerialNumber"), &s) && s == serial));
+        bool equal = athdv_mac_display_number(info, CFSTR("DisplayVendorID"), &v) &&
+            athdv_mac_display_number(info, CFSTR("DisplayProductID"), &p) && v == vendor && p == product &&
+            (!serial || (athdv_mac_display_number(info, CFSTR("DisplaySerialNumber"), &s) && s == serial));
         if (!equal) { CFRelease(info); continue; }
         if (match) { CFRelease(info); ambiguous = true; break; }
         match = info;
@@ -124,7 +124,7 @@ static void catdv_mac_display_edid(CATDVLIB_DEVICE* d, CGDirectDisplayID id, con
                 CFIndex length = CFDataGetLength(data);
                 if (length < 0 || (CATALYST_ULONG) length > CATALYST_NUINT_MAX)
                     d->display.edid_status = CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW;
-                else d->display.edid_status = catdv_display_copy_edid(&d->display, CFDataGetBytePtr(data), (catalyst::NUINT) length);
+                else d->display.edid_status = athdv_display_copy_edid(&d->display, CFDataGetBytePtr(data), (catalyst::NUINT) length);
             }
         }
         CFTypeRef names = CFDictionaryGetValue(match, CFSTR("DisplayProductName"));
@@ -144,7 +144,7 @@ static void catdv_mac_display_edid(CATDVLIB_DEVICE* d, CGDirectDisplayID id, con
     if (match) CFRelease(match);
 }
 
-static catalyst::STATUS_CODE catdv_mac_displays(CATDVLIB_DEVICES* snapshot) {
+static catalyst::STATUS_CODE athdv_mac_displays(ATHDVLIB_DEVICES* snapshot) {
     uint32_t count = 0;
     if (CGGetOnlineDisplayList(0, 0, &count) != kCGErrorSuccess) return CATALYST_STATUS_CODE_ERROR_IO_ERROR;
     if (!count) return CATALYST_STATUS_CODE_SUCCESS;
@@ -158,30 +158,30 @@ static catalyst::STATUS_CODE catdv_mac_displays(CATDVLIB_DEVICES* snapshot) {
     if (CGGetOnlineDisplayList(count, ids, &actual) != kCGErrorSuccess || actual > count) status = CATALYST_STATUS_CODE_ERROR_IO_ERROR;
     for (uint32_t j = 0; j < actual && status == CATALYST_STATUS_CODE_SUCCESS; ++j) {
         CGDirectDisplayID id = ids[j];
-        CATDVLIB_DEVICE* d;
-        r = catdv_native_add(snapshot, &d);
+        ATHDVLIB_DEVICE* d;
+        r = athdv_native_add(snapshot, &d);
         if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) { status = r.status; break; }
-        catdv_display_init(&d->display);
+        athdv_display_init(&d->display);
         d->display.handle = (catalyst::NUINT) id;
         d->display.handle_status = CATALYST_STATUS_CODE_SUCCESS;
-        d->type = CATDVLIB_DEVICE_LOGICAL;
+        d->type = ATHDVLIB_DEVICE_LOGICAL;
         d->scheme = (CATALYST_ASCII) "darwin-display";
-        catdv_mac_hex(d->identifier.value, id, 8);
+        athdv_mac_hex(d->identifier.value, id, 8);
         d->identifier.status = CATALYST_STATUS_CODE_SUCCESS;
         d->capability_status = CATALYST_STATUS_CODE_SUCCESS;
         d->output = CATALYST_TRUE;
         uint32_t vendor = CGDisplayVendorNumber(id), product = CGDisplayModelNumber(id);
         if (vendor) {
             d->hwid_scheme = (CATALYST_ASCII) "darwin-display-model";
-            catdv_mac_hex(d->hwids[0].value, vendor, 8);
+            athdv_mac_hex(d->hwids[0].value, vendor, 8);
             d->hwids[0].value[8] = ':';
-            catdv_mac_hex(d->hwids[0].value + 9, product, 8);
+            athdv_mac_hex(d->hwids[0].value + 9, product, 8);
             d->hwids[0].status = CATALYST_STATUS_CODE_SUCCESS;
             d->hwid_count = 1;
         }
         uint32_t serial = CGDisplaySerialNumber(id);
         if (serial) {
-            catdv_mac_hex(d->serial.value, serial, 8);
+            athdv_mac_hex(d->serial.value, serial, 8);
             d->serial.status = CATALYST_STATUS_CODE_SUCCESS;
         }
         if (CGDisplayIsBuiltin(id)) {
@@ -189,22 +189,22 @@ static catalyst::STATUS_CODE catdv_mac_displays(CATDVLIB_DEVICES* snapshot) {
             catmm_copy(d->descriptor.value, name, sizeof(name));
             d->descriptor.status = CATALYST_STATUS_CODE_SUCCESS;
         }
-        catdv_mac_display_edid(d, id, ids, actual);
+        athdv_mac_display_edid(d, id, ids, actual);
     }
     r = catmm_free(memory);
     return CATALYST_STATUS_CODE_IS_SUCCESS(r.status) ? status : r.status;
 }
 
-CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices) {
+CATALYST_RESULT athdv_devices_enumerate(ATHDVLIB_DEVICES** devices) {
     *devices = 0;
     IOHIDManagerRef manager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
     if (!manager) return catalyst::RESULT(catalyst::STATUS_CODE_ERROR_ALLOCATION_FAILED, 0x01, 0x01, 0);
     IOHIDManagerSetDeviceMatching(manager, 0);
     CFSetRef set = IOHIDManagerCopyDevices(manager);
     CATMMLIB_POINTERW memory = 0;
-    catalyst::RESULT r = catmm_alloc(&memory, sizeof(CATDVLIB_DEVICES));
+    catalyst::RESULT r = catmm_alloc(&memory, sizeof(ATHDVLIB_DEVICES));
     if (!catalyst::status_code_is_success(r.status)) { if (set) CFRelease(set); CFRelease(manager); return catalyst::RESULT(r.status, 0x01, 0x02, r.detail); }
-    CATDVLIB_DEVICES* snapshot = (CATDVLIB_DEVICES*) memory;
+    ATHDVLIB_DEVICES* snapshot = (ATHDVLIB_DEVICES*) memory;
     catalyst::STATUS_CODE status = catalyst::STATUS_CODE_SUCCESS;
     if (set) {
         CFIndex count = CFSetGetCount(set);
@@ -216,7 +216,7 @@ CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices) {
             else {
                 CFSetGetValues(set, (const void**) values);
                 for (CFIndex j = 0; j < count && status == catalyst::STATUS_CODE_SUCCESS; ++j)
-                    status = catdv_mac_entry(snapshot, ((IOHIDDeviceRef*) values)[j]);
+                    status = athdv_mac_entry(snapshot, ((IOHIDDeviceRef*) values)[j]);
                 r = catmm_free(values);
                 if (!catalyst::status_code_is_success(r.status)) status = r.status;
             }
@@ -224,9 +224,9 @@ CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices) {
         CFRelease(set);
     }
     CFRelease(manager);
-    if (status == CATALYST_STATUS_CODE_SUCCESS) status = catdv_mac_displays(snapshot);
+    if (status == CATALYST_STATUS_CODE_SUCCESS) status = athdv_mac_displays(snapshot);
     if (status != catalyst::STATUS_CODE_SUCCESS) {
-        r = catdv_devices_free(snapshot);
+        r = athdv_devices_free(snapshot);
         if (!catalyst::status_code_is_success(r.status)) return catalyst::RESULT(r.status, 0x01, 0x03, r.detail);
         return catalyst::RESULT(status, 0x01, 0x05, 0);
     }

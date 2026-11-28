@@ -18,13 +18,13 @@
             "alignment": "block",
             "children": [
                 {
-                    "title": "CATSYLIB",
-                    "path": "/api-reference/catsylib",
+                    "title": "ATHIDLIB",
+                    "path": "/api-reference/athidlib",
                     "alignment": "block"
                 },
                 {
-                    "title": "CATDVLIB",
-                    "path": "/api-reference/catdvlib",
+                    "title": "ATHDVLIB",
+                    "path": "/api-reference/athdvlib",
                     "alignment": "block"
                 }
             ]

@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include "catdvlib.hpp"
+#include "athdvlib.hpp"
 
 
 struct TestReport {
@@ -49,24 +49,24 @@ static inline bool same_result(catalyst::RESULT a, catalyst::RESULT b) {
         a.operation == b.operation && a.detail == b.detail;
 }
 
-static inline bool valid_identifier(const CATDVLIB_IDENTIFIER& id) {
+static inline bool valid_identifier(const ATHDVLIB_IDENTIFIER& id) {
     return id.scheme && *id.scheme && id.value && *id.value;
 }
-static inline bool same_identifier(const CATDVLIB_IDENTIFIER& a, const CATDVLIB_IDENTIFIER& b) {
+static inline bool same_identifier(const ATHDVLIB_IDENTIFIER& a, const ATHDVLIB_IDENTIFIER& b) {
     return valid_identifier(a) && valid_identifier(b) &&
         std::strcmp((const char*) a.scheme, (const char*) b.scheme) == 0 &&
         std::strcmp((const char*) a.value, (const char*) b.value) == 0;
 }
 
-static inline void print_device(catalyst::NUINT index, const CATDVLIB_DEVICE* d) {
-    CATDVLIB_IDENTIFIER id = {0, 0};
-    catalyst::RESULT r = catdv_device_get_identifier(d, &id);
+static inline void print_device(catalyst::NUINT index, const ATHDVLIB_DEVICE* d) {
+    ATHDVLIB_IDENTIFIER id = {0, 0};
+    catalyst::RESULT r = athdv_device_get_identifier(d, &id);
     std::printf("\nDevice %lu", (unsigned long) index);
     if (r.status == catalyst::STATUS_CODE_SUCCESS && valid_identifier(id))
         std::printf(" [%s] %s", (const char*) id.scheme, (const char*) id.value);
     catalyst::UTF8 manufacturer = 0, product = 0;
-    catdv_device_get_manufacturer(d, &manufacturer);
-    catdv_device_get_product(d, &product);
+    athdv_device_get_manufacturer(d, &manufacturer);
+    athdv_device_get_product(d, &product);
     if (manufacturer || product)
         std::printf(" — %s%s%s", manufacturer ? (const char*) manufacturer : "",
             manufacturer && product ? " / " : "", product ? (const char*) product : "");
@@ -80,15 +80,15 @@ static inline bool take_verbose(int* argc, char*** argv) {
     return false;
 }
 
-static inline CATDVLIB_DEVICES* test_snapshot(TestReport* report) {
-    CATDVLIB_DEVICES* snapshot = 0;
-    catalyst::RESULT r = catdv_devices_enumerate(&snapshot);
+static inline ATHDVLIB_DEVICES* test_snapshot(TestReport* report) {
+    ATHDVLIB_DEVICES* snapshot = 0;
+    catalyst::RESULT r = athdv_devices_enumerate(&snapshot);
     bool ok = report->result("enumerate devices", r, 0x01);
     report->check((r.status == catalyst::STATUS_CODE_SUCCESS) == (snapshot != 0), "snapshot ownership");
     return ok ? snapshot : 0;
 }
 
-/* Timing follows the existing CATSYLIB CPU-time convention. Count no-ops
+/* Timing follows the existing ATHIDLIB CPU-time convention. Count no-ops
  * separately: polling rate is not physical device throughput. */
 struct PerfOutcome {
     catalyst::RESULT result;

@@ -182,7 +182,7 @@ On such a target, `RESULT` can be constructed from, assigned from, or converted 
 <code>capacity = 6</code> <span style="opacity:0.75;">or</span> <code>capacity = 5</code>
 <div style="margin-top:0.3rem;">Caller provides a writable destination of the stated extent and a separate required-size output. Assume the system name is Linux.</div>
 <div style="text-align:center;line-height:1.3;padding:0.3rem 0;opacity:0.82;font-size:0.9em;" aria-hidden="true">↓</div>
-<div style="padding:0.65rem;border:1px solid color-mix(in srgb, currentColor 22%, transparent);border-radius:6px;max-width:22rem;margin:auto;"><code>catsy_system_get_name</code><br/><small>Function retrieves, validates, and measures the native value</small></div>
+<div style="padding:0.65rem;border:1px solid color-mix(in srgb, currentColor 22%, transparent);border-radius:6px;max-width:22rem;margin:auto;"><code>athid_system_get_name</code><br/><small>Function retrieves, validates, and measures the native value</small></div>
 <div style="text-align:center;line-height:1.3;padding:0.3rem 0;opacity:0.82;font-size:0.9em;" aria-hidden="true">↓</div>
 <div style="display:flex;flex-wrap:wrap;gap:0.65rem;justify-content:center;">
 <div style="flex:1 1 10rem;min-width:0;padding:0.65rem;border:1px solid color-mix(in srgb, currentColor 22%, transparent);border-radius:6px;"><strong><code>SUCCESS</code></strong><br/>Linux + terminator; required = 6</div>
@@ -217,7 +217,7 @@ Return `CATALYST_RESULT` (`RESULT` in C++) by value on every exit, including suc
 
 | Function | Returns | Why? |
 | --- | --- | --- |
-| [`catsy_system_get_name`](../api-reference/catsylib/index.md#catsy_system_get_name) | `CATALYST_RESULT` | Native retrieval, validation, or copying may fail. |
+| [`athid_system_get_name`](../api-reference/athidlib/index.md#athid_system_get_name) | `CATALYST_RESULT` | Native retrieval, validation, or copying may fail. |
 | Non-reporting value query | Corresponding Catalyst type | An ordinary value with no reportable failure. |
 | Non-reporting procedure | `void` | Writes outputs or mutates existing storage without a reportable outcome. |
 

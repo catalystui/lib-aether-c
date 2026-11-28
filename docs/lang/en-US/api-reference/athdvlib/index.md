@@ -1,11 +1,11 @@
-# CATDVLIB
+# ATHDVLIB
 
 Provides native device and display discovery, identification, and interoperability.
 
-**C Header:** `catdvlib.h`  
-**C++ Header:** `catdvlib.hpp`  
+**C Header:** `athdvlib.h`  
+**C++ Header:** `athdvlib.hpp`  
 **Namespace:** `catalyst::device`  
-**Library:** `catdv`  
+**Library:** `athdv`  
 **Dependencies:** CATALYST, CATMMLIB, CATTELIB; platform-native system APIs.  
 **Specification:** [FDEFSPEC](https://catalystui.org/specifications/languages/fdefspec/)
 
@@ -37,61 +37,61 @@ EDID bytes are copied as supplied by the operating system, including extensions,
 
 | Type or macro | Meaning |
 | --- | --- |
-| [CATDVLIB_API](#catdvlib_api) | Native export/import annotation. |
-| [CATDVLIB_DEVICE](#catdvlib_device-and-catdvlib_devices) | Borrowed device record. |
-| [CATDVLIB_DEVICES](#catdvlib_device-and-catdvlib_devices) | Owned snapshot. |
-| [CATDVLIB_IDENTIFIER](#catdvlib_identifier) | Scheme-qualified identifier. |
-| [CATDVLIB_DEVICE_TYPE](#catdvlib_device_type) | Physical/logical classification. |
+| [ATHDVLIB_API](#athdvlib_api) | Native export/import annotation. |
+| [ATHDVLIB_DEVICE](#athdvlib_device-and-athdvlib_devices) | Borrowed device record. |
+| [ATHDVLIB_DEVICES](#athdvlib_device-and-athdvlib_devices) | Owned snapshot. |
+| [ATHDVLIB_IDENTIFIER](#athdvlib_identifier) | Scheme-qualified identifier. |
+| [ATHDVLIB_DEVICE_TYPE](#athdvlib_device_type) | Physical/logical classification. |
 
 | Function | Behavior |
 | --- | --- |
-| [catdv_devices_enumerate](#catdv_devices_enumerate) | Acquire a device snapshot. |
-| [catdv_devices_free](#catdv_devices_free) | Release a snapshot. |
-| [catdv_devices_get_count](#catdv_devices_get_count) | Count entries. |
-| [catdv_devices_get](#catdv_devices_get) | Borrow an indexed entry. |
-| [catdv_device_get_type](#catdv_device_get_type) | Retrieve device classification. |
-| [catdv_device_get_identifier](#catdv_device_get_identifier) | Borrow an instance identifier. |
-| [catdv_device_get_hwid_count](#catdv_device_get_hwid_count) | Count available HWIDs. |
-| [catdv_device_get_hwid](#catdv_device_get_hwid) | Borrow an indexed HWID. |
-| [catdv_device_get_serial](#catdv_device_get_serial) | Borrow the serial number. |
-| [catdv_device_get_manufacturer](#catdv_device_get_manufacturer) | Borrow the manufacturer name. |
-| [catdv_device_get_product](#catdv_device_get_product) | Borrow the product name. |
-| [catdv_device_get_descriptor](#catdv_device_get_descriptor) | Borrow the descriptor. |
-| [catdv_device_get_revision](#catdv_device_get_revision) | Borrow the revision. |
-| [catdv_device_has_input](#catdv_device_has_input) | Query native input capability. |
-| [catdv_device_has_output](#catdv_device_has_output) | Query native output capability. |
-| [catdv_device_is_display](#catdv_device_is_display) | Identify a display endpoint. |
-| [catdv_display_get_edid](#catdv_display_get_edid) | Borrow original EDID bytes. |
-| [catdv_display_get_native_handle](#catdv_display_get_native_handle) | Retrieve a native display identity. |
-| [catdv_devices_find_identifier](#catdv_devices_find_identifier) | Find an exact instance identifier. |
-| [catdv_devices_find_native_display](#catdv_devices_find_native_display) | Resolve a native display identity. |
+| [athdv_devices_enumerate](#athdv_devices_enumerate) | Acquire a device snapshot. |
+| [athdv_devices_free](#athdv_devices_free) | Release a snapshot. |
+| [athdv_devices_get_count](#athdv_devices_get_count) | Count entries. |
+| [athdv_devices_get](#athdv_devices_get) | Borrow an indexed entry. |
+| [athdv_device_get_type](#athdv_device_get_type) | Retrieve device classification. |
+| [athdv_device_get_identifier](#athdv_device_get_identifier) | Borrow an instance identifier. |
+| [athdv_device_get_hwid_count](#athdv_device_get_hwid_count) | Count available HWIDs. |
+| [athdv_device_get_hwid](#athdv_device_get_hwid) | Borrow an indexed HWID. |
+| [athdv_device_get_serial](#athdv_device_get_serial) | Borrow the serial number. |
+| [athdv_device_get_manufacturer](#athdv_device_get_manufacturer) | Borrow the manufacturer name. |
+| [athdv_device_get_product](#athdv_device_get_product) | Borrow the product name. |
+| [athdv_device_get_descriptor](#athdv_device_get_descriptor) | Borrow the descriptor. |
+| [athdv_device_get_revision](#athdv_device_get_revision) | Borrow the revision. |
+| [athdv_device_has_input](#athdv_device_has_input) | Query native input capability. |
+| [athdv_device_has_output](#athdv_device_has_output) | Query native output capability. |
+| [athdv_device_is_display](#athdv_device_is_display) | Identify a display endpoint. |
+| [athdv_display_get_edid](#athdv_display_get_edid) | Borrow original EDID bytes. |
+| [athdv_display_get_native_handle](#athdv_display_get_native_handle) | Retrieve a native display identity. |
+| [athdv_devices_find_identifier](#athdv_devices_find_identifier) | Find an exact instance identifier. |
+| [athdv_devices_find_native_display](#athdv_devices_find_native_display) | Resolve a native display identity. |
 
 ## Macros
 
-### CATDVLIB_API
+### ATHDVLIB_API
 
-Export/import annotation for the C ABI. On Windows, `CATDVLIB_EXPORTS` selects `__declspec(dllexport)` and `CATDVLIB_USE_DLL` selects `__declspec(dllimport)`; otherwise the annotation is empty.
+Export/import annotation for the C ABI. On Windows, `ATHDVLIB_EXPORTS` selects `__declspec(dllexport)` and `ATHDVLIB_USE_DLL` selects `__declspec(dllimport)`; otherwise the annotation is empty.
 
 ## Types and constants
 
-### CATDVLIB_DEVICE and CATDVLIB_DEVICES
+### ATHDVLIB_DEVICE and ATHDVLIB_DEVICES
 
-Opaque device and snapshot representations. A device is borrowed from its owning snapshot; release the snapshot with `catdv_devices_free`.
+Opaque device and snapshot representations. A device is borrowed from its owning snapshot; release the snapshot with `athdv_devices_free`.
 
 ```c
-typedef struct CATDVLIB_DEVICE CATDVLIB_DEVICE;
-typedef struct CATDVLIB_DEVICES CATDVLIB_DEVICES;
+typedef struct ATHDVLIB_DEVICE ATHDVLIB_DEVICE;
+typedef struct ATHDVLIB_DEVICES ATHDVLIB_DEVICES;
 ```
 
-### CATDVLIB_IDENTIFIER
+### ATHDVLIB_IDENTIFIER
 
 A scheme-qualified native identity; neither field alone is a globally unique identifier.
 
 ```c
-typedef struct CATDVLIB_IDENTIFIER {
+typedef struct ATHDVLIB_IDENTIFIER {
     CATALYST_ASCII scheme;
     CATALYST_UTF8 value;
-} CATDVLIB_IDENTIFIER;
+} ATHDVLIB_IDENTIFIER;
 ```
 
 **Fields:**  
@@ -100,33 +100,33 @@ typedef struct CATDVLIB_IDENTIFIER {
 
 Returned strings are borrowed. For lookup, both strings must be valid and terminated.
 
-### CATDVLIB_DEVICE_TYPE
+### ATHDVLIB_DEVICE_TYPE
 
 Byte-valued classification of the native device record.
 
 ```c
-typedef CATALYST_BYTE CATDVLIB_DEVICE_TYPE;
-#define CATDVLIB_DEVICE_UNKNOWN  0x00
-#define CATDVLIB_DEVICE_PHYSICAL 0x01
-#define CATDVLIB_DEVICE_LOGICAL  0x02
+typedef CATALYST_BYTE ATHDVLIB_DEVICE_TYPE;
+#define ATHDVLIB_DEVICE_UNKNOWN  0x00
+#define ATHDVLIB_DEVICE_PHYSICAL 0x01
+#define ATHDVLIB_DEVICE_LOGICAL  0x02
 ```
 
 | Constant | Meaning |
 | --- | --- |
-| `CATDVLIB_DEVICE_UNKNOWN` | No physical/logical classification established. |
-| `CATDVLIB_DEVICE_PHYSICAL` | Physical device record. |
-| `CATDVLIB_DEVICE_LOGICAL` | Logical device or interface record. |
+| `ATHDVLIB_DEVICE_UNKNOWN` | No physical/logical classification established. |
+| `ATHDVLIB_DEVICE_PHYSICAL` | Physical device record. |
+| `ATHDVLIB_DEVICE_LOGICAL` | Logical device or interface record. |
 
 The C++ wrappers use the same C ABI representations and forward to the C functions.
 
 ## Functions
 
-### catdv_devices_enumerate
+### athdv_devices_enumerate
 
 Enumerate a snapshot into an empty output slot; null on failure.
 
 ```c
-CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices);
+CATALYST_RESULT athdv_devices_enumerate(ATHDVLIB_DEVICES** devices);
 ```
 
 **Parameters:**  
@@ -146,12 +146,12 @@ CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices);
 | `0x00010600` | SUCCESS | 0x06 | — |
 | `0x8501F000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
-### catdv_devices_free
+### athdv_devices_free
 
 Release a live snapshot; on partial cleanup failure retry using the same snapshot.
 
 ```c
-CATALYST_RESULT catdv_devices_free(CATDVLIB_DEVICES* devices);
+CATALYST_RESULT athdv_devices_free(ATHDVLIB_DEVICES* devices);
 ```
 
 **Parameters:**  
@@ -169,12 +169,12 @@ CATALYST_RESULT catdv_devices_free(CATDVLIB_DEVICES* devices);
 | `0xSS0204DD` | Dependency failure | Release owned EDID bytes | Dependency detail |
 | `0x8502F000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
-### catdv_devices_get_count
+### athdv_devices_get_count
 
 Return the number of entries in a live snapshot.
 
 ```c
-CATALYST_NUINT catdv_devices_get_count(const CATDVLIB_DEVICES* devices);
+CATALYST_NUINT athdv_devices_get_count(const ATHDVLIB_DEVICES* devices);
 ```
 
 **Parameters:**  
@@ -182,12 +182,12 @@ CATALYST_NUINT catdv_devices_get_count(const CATDVLIB_DEVICES* devices);
 
 **Returns:** Return the number of entries in a live snapshot.
 
-### catdv_devices_get
+### athdv_devices_get
 
 Borrow a device at a valid snapshot index until the snapshot is freed.
 
 ```c
-const CATDVLIB_DEVICE* catdv_devices_get(const CATDVLIB_DEVICES* devices, CATALYST_NUINT index);
+const ATHDVLIB_DEVICE* athdv_devices_get(const ATHDVLIB_DEVICES* devices, CATALYST_NUINT index);
 ```
 
 **Parameters:**  
@@ -196,12 +196,12 @@ const CATDVLIB_DEVICE* catdv_devices_get(const CATDVLIB_DEVICES* devices, CATALY
 
 **Returns:** Borrow a device at a valid snapshot index until the snapshot is freed.
 
-### catdv_device_get_type
+### athdv_device_get_type
 
 Return the device classification from the snapshot.
 
 ```c
-CATDVLIB_DEVICE_TYPE catdv_device_get_type(const CATDVLIB_DEVICE* device);
+ATHDVLIB_DEVICE_TYPE athdv_device_get_type(const ATHDVLIB_DEVICE* device);
 ```
 
 **Parameters:**  
@@ -209,12 +209,12 @@ CATDVLIB_DEVICE_TYPE catdv_device_get_type(const CATDVLIB_DEVICE* device);
 
 **Returns:** Return the device classification from the snapshot.
 
-### catdv_device_get_identifier
+### athdv_device_get_identifier
 
 Retrieve a borrowed system instance identifier; zero fields on failure.
 
 ```c
-CATALYST_RESULT catdv_device_get_identifier(const CATDVLIB_DEVICE* device, CATDVLIB_IDENTIFIER* identifier);
+CATALYST_RESULT athdv_device_get_identifier(const ATHDVLIB_DEVICE* device, ATHDVLIB_IDENTIFIER* identifier);
 ```
 
 **Parameters:**  
@@ -232,12 +232,12 @@ CATALYST_RESULT catdv_device_get_identifier(const CATDVLIB_DEVICE* device, CATDV
 | `0x00060200` | SUCCESS | Windows/Darwin instance identity | — |
 | `0x8506F000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
-### catdv_device_get_hwid_count
+### athdv_device_get_hwid_count
 
 Retrieve the count of available hardware identifiers; zero on failure.
 
 ```c
-CATALYST_RESULT catdv_device_get_hwid_count(const CATDVLIB_DEVICE* device, CATALYST_NUINT* count);
+CATALYST_RESULT athdv_device_get_hwid_count(const ATHDVLIB_DEVICE* device, CATALYST_NUINT* count);
 ```
 
 **Parameters:**  
@@ -255,12 +255,12 @@ CATALYST_RESULT catdv_device_get_hwid_count(const CATDVLIB_DEVICE* device, CATAL
 | `0xSS070300` | Bus identifier retrieval error | 0x03 | — |
 | `0x8507F000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
-### catdv_device_get_hwid
+### athdv_device_get_hwid
 
 Retrieve a borrowed hardware identifier at an index from the reported count; zero fields on failure.
 
 ```c
-CATALYST_RESULT catdv_device_get_hwid(const CATDVLIB_DEVICE* device, CATALYST_NUINT index, CATDVLIB_IDENTIFIER* hwid);
+CATALYST_RESULT athdv_device_get_hwid(const ATHDVLIB_DEVICE* device, CATALYST_NUINT index, ATHDVLIB_IDENTIFIER* hwid);
 ```
 
 **Parameters:**  
@@ -278,12 +278,12 @@ CATALYST_RESULT catdv_device_get_hwid(const CATDVLIB_DEVICE* device, CATALYST_NU
 | `0x00080200` | SUCCESS | 0x02 (bus/model identifier) | — |
 | `0x8508F000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
-### catdv_device_get_serial
+### athdv_device_get_serial
 
 Retrieve the borrowed manufacturer-assigned serial number; null on failure.
 
 ```c
-CATALYST_RESULT catdv_device_get_serial(const CATDVLIB_DEVICE* device, CATALYST_UTF8* serial);
+CATALYST_RESULT athdv_device_get_serial(const ATHDVLIB_DEVICE* device, CATALYST_UTF8* serial);
 ```
 
 **Parameters:**  
@@ -300,12 +300,12 @@ CATALYST_RESULT catdv_device_get_serial(const CATDVLIB_DEVICE* device, CATALYST_
 | `0x00090200` | SUCCESS | 0x02 | — |
 | `0x8509F000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
-### catdv_device_get_manufacturer
+### athdv_device_get_manufacturer
 
 Retrieve the borrowed manufacturer name; null on failure.
 
 ```c
-CATALYST_RESULT catdv_device_get_manufacturer(const CATDVLIB_DEVICE* device, CATALYST_UTF8* manufacturer);
+CATALYST_RESULT athdv_device_get_manufacturer(const ATHDVLIB_DEVICE* device, CATALYST_UTF8* manufacturer);
 ```
 
 **Parameters:**  
@@ -322,12 +322,12 @@ CATALYST_RESULT catdv_device_get_manufacturer(const CATDVLIB_DEVICE* device, CAT
 | `0x000A0200` | SUCCESS | 0x02 | — |
 | `0x850AF000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
-### catdv_device_get_product
+### athdv_device_get_product
 
 Retrieve the borrowed product name; null on failure.
 
 ```c
-CATALYST_RESULT catdv_device_get_product(const CATDVLIB_DEVICE* device, CATALYST_UTF8* product);
+CATALYST_RESULT athdv_device_get_product(const ATHDVLIB_DEVICE* device, CATALYST_UTF8* product);
 ```
 
 **Parameters:**  
@@ -344,12 +344,12 @@ CATALYST_RESULT catdv_device_get_product(const CATDVLIB_DEVICE* device, CATALYST
 | `0x000B0200` | SUCCESS | 0x02 | — |
 | `0x850BF000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
-### catdv_device_get_descriptor
+### athdv_device_get_descriptor
 
 Retrieve the borrowed human-readable descriptor; null on failure.
 
 ```c
-CATALYST_RESULT catdv_device_get_descriptor(const CATDVLIB_DEVICE* device, CATALYST_UTF8* descriptor);
+CATALYST_RESULT athdv_device_get_descriptor(const ATHDVLIB_DEVICE* device, CATALYST_UTF8* descriptor);
 ```
 
 **Parameters:**  
@@ -366,12 +366,12 @@ CATALYST_RESULT catdv_device_get_descriptor(const CATDVLIB_DEVICE* device, CATAL
 | `0x000C0200` | SUCCESS | 0x02 | — |
 | `0x850CF000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
-### catdv_device_get_revision
+### athdv_device_get_revision
 
 Retrieve the borrowed hardware revision; null on failure.
 
 ```c
-CATALYST_RESULT catdv_device_get_revision(const CATDVLIB_DEVICE* device, CATALYST_UTF8* revision);
+CATALYST_RESULT athdv_device_get_revision(const ATHDVLIB_DEVICE* device, CATALYST_UTF8* revision);
 ```
 
 **Parameters:**  
@@ -388,12 +388,12 @@ CATALYST_RESULT catdv_device_get_revision(const CATDVLIB_DEVICE* device, CATALYS
 | `0x000D0200` | SUCCESS | 0x02 | — |
 | `0x850DF000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
-### catdv_device_has_input
+### athdv_device_has_input
 
 Query whether the device exposes native input capabilities; false on failure.
 
 ```c
-CATALYST_RESULT catdv_device_has_input(const CATDVLIB_DEVICE* device, CATALYST_BOOL* supported);
+CATALYST_RESULT athdv_device_has_input(const ATHDVLIB_DEVICE* device, CATALYST_BOOL* supported);
 ```
 
 **Parameters:**  
@@ -411,12 +411,12 @@ CATALYST_RESULT catdv_device_has_input(const CATDVLIB_DEVICE* device, CATALYST_B
 | `0x000E0300` | SUCCESS | 0x03 | — |
 | `0x850EF000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
-### catdv_device_has_output
+### athdv_device_has_output
 
 Query whether the device exposes native output capabilities; false on failure.
 
 ```c
-CATALYST_RESULT catdv_device_has_output(const CATDVLIB_DEVICE* device, CATALYST_BOOL* supported);
+CATALYST_RESULT athdv_device_has_output(const ATHDVLIB_DEVICE* device, CATALYST_BOOL* supported);
 ```
 
 **Parameters:**  
@@ -434,10 +434,10 @@ CATALYST_RESULT catdv_device_has_output(const CATDVLIB_DEVICE* device, CATALYST_
 | `0x000F0300` | SUCCESS | 0x03 | — |
 | `0x850FF000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
-### catdv_device_is_display
+### athdv_device_is_display
 
 ```c
-CATALYST_BOOL catdv_device_is_display(const CATDVLIB_DEVICE* device);
+CATALYST_BOOL athdv_device_is_display(const ATHDVLIB_DEVICE* device);
 ```
 
 **Parameters:**  
@@ -445,10 +445,10 @@ CATALYST_BOOL catdv_device_is_display(const CATDVLIB_DEVICE* device);
 
 **Returns:** True if the entry represents a native display endpoint; false otherwise.
 
-### catdv_display_get_edid
+### athdv_display_get_edid
 
 ```c
-CATALYST_RESULT catdv_display_get_edid(const CATDVLIB_DEVICE* device, const CATALYST_BYTE** bytes, CATALYST_NUINT* size);
+CATALYST_RESULT athdv_display_get_edid(const ATHDVLIB_DEVICE* device, const CATALYST_BYTE** bytes, CATALYST_NUINT* size);
 ```
 
 **Parameters:**  
@@ -467,10 +467,10 @@ CATALYST_RESULT catdv_display_get_edid(const CATDVLIB_DEVICE* device, const CATA
 | `0x00100300` | Success | Borrow EDID bytes and extent | — |
 | `0x8510F000` | Not implemented | Target fallback | — |
 
-### catdv_display_get_native_handle
+### athdv_display_get_native_handle
 
 ```c
-CATALYST_RESULT catdv_display_get_native_handle(const CATDVLIB_DEVICE* device, CATALYST_NUINT* handle);
+CATALYST_RESULT athdv_display_get_native_handle(const ATHDVLIB_DEVICE* device, CATALYST_NUINT* handle);
 ```
 
 **Parameters:**  
@@ -488,10 +488,10 @@ CATALYST_RESULT catdv_display_get_native_handle(const CATDVLIB_DEVICE* device, C
 | `0x00110300` | Success | Return borrowed native identity | — |
 | `0x8511F000` | Not implemented | Target fallback | — |
 
-### catdv_devices_find_identifier
+### athdv_devices_find_identifier
 
 ```c
-CATALYST_RESULT catdv_devices_find_identifier(const CATDVLIB_DEVICES* devices, const CATDVLIB_IDENTIFIER* identifier, const CATDVLIB_DEVICE** device);
+CATALYST_RESULT athdv_devices_find_identifier(const ATHDVLIB_DEVICES* devices, const ATHDVLIB_IDENTIFIER* identifier, const ATHDVLIB_DEVICE** device);
 ```
 
 **Parameters:**  
@@ -510,10 +510,10 @@ CATALYST_RESULT catdv_devices_find_identifier(const CATDVLIB_DEVICES* devices, c
 | `0x88120300` | Not found | No matching entry | — |
 | `0x00120400` | Success | Return unique matching entry | — |
 
-### catdv_devices_find_native_display
+### athdv_devices_find_native_display
 
 ```c
-CATALYST_RESULT catdv_devices_find_native_display(const CATDVLIB_DEVICES* devices, CATALYST_NUINT handle, const CATDVLIB_DEVICE** device);
+CATALYST_RESULT athdv_devices_find_native_display(const ATHDVLIB_DEVICES* devices, CATALYST_NUINT handle, const ATHDVLIB_DEVICE** device);
 ```
 
 **Parameters:**  

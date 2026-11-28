@@ -1,31 +1,31 @@
-#include "catdvlib.native.hpp"
-#include "catdvlib.win32.hpp"
+#include "athdvlib.native.hpp"
+#include "athdvlib.win32.hpp"
 #include <setupapi.h>
 
-static void catdv_win_string(const WCHAR* value, catalyst::NUINT units, CATDVLIB_NATIVE_TEXT* text) {
-    text->status = catdv_win_utf8(value, units, text->value, sizeof(text->value));
+static void athdv_win_string(const WCHAR* value, catalyst::NUINT units, ATHDVLIB_NATIVE_TEXT* text) {
+    text->status = athdv_win_utf8(value, units, text->value, sizeof(text->value));
 }
-static void catdv_win_property(HDEVINFO list, SP_DEVINFO_DATA* info, DWORD property, CATDVLIB_NATIVE_TEXT* text) {
+static void athdv_win_property(HDEVINFO list, SP_DEVINFO_DATA* info, DWORD property, ATHDVLIB_NATIVE_TEXT* text) {
     WCHAR value[1024]; DWORD type = 0, bytes = 0;
     catmm_fill(value, 0, sizeof(value));
     if (!SetupDiGetDeviceRegistryPropertyW(list, info, property, &type, (PBYTE) value, sizeof(value), &bytes)) {
         DWORD e = GetLastError();
-        text->status = e == ERROR_INVALID_DATA ? CATALYST_STATUS_CODE_ERROR_NOT_FOUND : catdv_win_error(e);
+        text->status = e == ERROR_INVALID_DATA ? CATALYST_STATUS_CODE_ERROR_NOT_FOUND : athdv_win_error(e);
         return;
     }
     if (type != REG_SZ || bytes % sizeof(WCHAR) || bytes > sizeof(value)) { text->status = CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT; return; }
-    catdv_win_string(value, bytes / sizeof(WCHAR), text);
+    athdv_win_string(value, bytes / sizeof(WCHAR), text);
 }
-static void catdv_win_metadata(HDEVINFO list, SP_DEVINFO_DATA* info, CATDVLIB_DEVICE* d) {
-    catdv_win_property(list, info, SPDRP_MFG, &d->manufacturer);
-    catdv_win_property(list, info, SPDRP_DEVICEDESC, &d->product);
-    catdv_win_property(list, info, SPDRP_FRIENDLYNAME, &d->descriptor);
+static void athdv_win_metadata(HDEVINFO list, SP_DEVINFO_DATA* info, ATHDVLIB_DEVICE* d) {
+    athdv_win_property(list, info, SPDRP_MFG, &d->manufacturer);
+    athdv_win_property(list, info, SPDRP_DEVICEDESC, &d->product);
+    athdv_win_property(list, info, SPDRP_FRIENDLYNAME, &d->descriptor);
     if (d->descriptor.status == CATALYST_STATUS_CODE_ERROR_NOT_FOUND) d->descriptor = d->product;
     WCHAR ids[4096]; DWORD type = 0, bytes = 0;
     d->hwid_scheme = (CATALYST_ASCII) "windows-pnp";
     if (!SetupDiGetDeviceRegistryPropertyW(list, info, SPDRP_HARDWAREID, &type, (PBYTE) ids, sizeof(ids), &bytes)) {
         DWORD e = GetLastError();
-        if (e != ERROR_INVALID_DATA) d->hwid_status = catdv_win_error(e);
+        if (e != ERROR_INVALID_DATA) d->hwid_status = athdv_win_error(e);
         return;
     }
     if (type != REG_MULTI_SZ || bytes % sizeof(WCHAR) || bytes > sizeof(ids)) { d->hwid_status = CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT; return; }
@@ -35,34 +35,34 @@ static void catdv_win_metadata(HDEVINFO list, SP_DEVINFO_DATA* info, CATDVLIB_DE
         while (end < extent && ids[end]) ++end;
         if (end == extent) { d->hwid_status = CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT; return; }
         if (d->hwid_count == 16) { d->hwid_status = CATALYST_STATUS_CODE_ERROR_BUFFER_OVERFLOW; return; }
-        CATDVLIB_NATIVE_TEXT* text = &d->hwids[d->hwid_count];
-        catdv_win_string(ids + pos, end - pos + 1, text);
+        ATHDVLIB_NATIVE_TEXT* text = &d->hwids[d->hwid_count];
+        athdv_win_string(ids + pos, end - pos + 1, text);
         if (text->status != CATALYST_STATUS_CODE_SUCCESS) { d->hwid_status = text->status; return; }
         ++d->hwid_count; pos = end + 1;
     }
     if (pos == extent) d->hwid_status = CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT;
 }
-static void catdv_win_hid(HANDLE handle, CATDVLIB_DEVICE* d) {
+static void athdv_win_hid(HANDLE handle, ATHDVLIB_DEVICE* d) {
     HIDP_CAPS caps;
-    d->capability_status = catdv_win_caps(handle, &caps);
+    d->capability_status = athdv_win_caps(handle, &caps);
     if (d->capability_status == CATALYST_STATUS_CODE_SUCCESS) {
         d->input = caps.InputReportByteLength ? CATALYST_TRUE : CATALYST_FALSE;
         d->output = caps.OutputReportByteLength ? CATALYST_TRUE : CATALYST_FALSE;
     }
     WCHAR value[256];
     catmm_fill(value, 0, sizeof(value));
-    if (HidD_GetManufacturerString(handle, value, sizeof(value))) catdv_win_string(value, 256, &d->manufacturer);
+    if (HidD_GetManufacturerString(handle, value, sizeof(value))) athdv_win_string(value, 256, &d->manufacturer);
     catmm_fill(value, 0, sizeof(value));
-    if (HidD_GetProductString(handle, value, sizeof(value))) catdv_win_string(value, 256, &d->product);
+    if (HidD_GetProductString(handle, value, sizeof(value))) athdv_win_string(value, 256, &d->product);
     catmm_fill(value, 0, sizeof(value));
-    if (HidD_GetSerialNumberString(handle, value, sizeof(value))) catdv_win_string(value, 256, &d->serial);
+    if (HidD_GetSerialNumberString(handle, value, sizeof(value))) athdv_win_string(value, 256, &d->serial);
 }
-static catalyst::STATUS_CODE catdv_win_scan(CATDVLIB_DEVICES* snapshot, CATALYST_BOOL hid) {
+static catalyst::STATUS_CODE athdv_win_scan(ATHDVLIB_DEVICES* snapshot, CATALYST_BOOL hid) {
     GUID guid;
     HidD_GetHidGuid(&guid);
     HDEVINFO list = SetupDiGetClassDevsW(hid ? &guid : 0, 0, 0, DIGCF_PRESENT |
         (hid ? DIGCF_DEVICEINTERFACE : DIGCF_ALLCLASSES));
-    if (list == INVALID_HANDLE_VALUE) return catdv_win_error(GetLastError());
+    if (list == INVALID_HANDLE_VALUE) return athdv_win_error(GetLastError());
     catalyst::STATUS_CODE status = CATALYST_STATUS_CODE_SUCCESS;
     for (DWORD index = 0; ; ++index) {
         SP_DEVINFO_DATA info; catmm_fill(&info, 0, sizeof(info)); info.cbSize = sizeof(info);
@@ -73,42 +73,42 @@ static catalyst::STATUS_CODE catdv_win_scan(CATDVLIB_DEVICES* snapshot, CATALYST
         if (hid) {
             SP_DEVICE_INTERFACE_DATA iface; catmm_fill(&iface, 0, sizeof(iface)); iface.cbSize = sizeof(iface);
             if (!SetupDiEnumDeviceInterfaces(list, 0, &guid, index, &iface)) {
-                DWORD e = GetLastError(); if (e != ERROR_NO_MORE_ITEMS) status = catdv_win_error(e); break;
+                DWORD e = GetLastError(); if (e != ERROR_NO_MORE_ITEMS) status = athdv_win_error(e); break;
             }
             catmm_fill(&storage, 0, sizeof(storage)); storage.detail.cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
             if (!SetupDiGetDeviceInterfaceDetailW(list, &iface, &storage.detail, sizeof(storage), 0, &info)) {
-                status = catdv_win_error(GetLastError()); break;
+                status = athdv_win_error(GetLastError()); break;
             }
             identity = storage.detail.DevicePath;
             units = (sizeof(storage) - ((const CATALYST_BYTE*) identity - storage.bytes)) / sizeof(WCHAR);
         } else {
             if (!SetupDiEnumDeviceInfo(list, index, &info)) {
-                DWORD e = GetLastError(); if (e != ERROR_NO_MORE_ITEMS) status = catdv_win_error(e); break;
+                DWORD e = GetLastError(); if (e != ERROR_NO_MORE_ITEMS) status = athdv_win_error(e); break;
             }
-            if (!SetupDiGetDeviceInstanceIdW(list, &info, instance, 1024, 0)) { status = catdv_win_error(GetLastError()); break; }
+            if (!SetupDiGetDeviceInstanceIdW(list, &info, instance, 1024, 0)) { status = athdv_win_error(GetLastError()); break; }
         }
-        CATDVLIB_DEVICE* d;
-        catalyst::RESULT r = catdv_native_add(snapshot, &d);
+        ATHDVLIB_DEVICE* d;
+        catalyst::RESULT r = athdv_native_add(snapshot, &d);
         if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) { status = r.status; break; }
         d->scheme = (CATALYST_ASCII) (hid ? "windows-hid" : "windows-pnp");
-        d->type = hid ? CATDVLIB_DEVICE_LOGICAL : CATDVLIB_DEVICE_UNKNOWN;
-        catdv_win_string(identity, units, &d->identifier);
+        d->type = hid ? ATHDVLIB_DEVICE_LOGICAL : ATHDVLIB_DEVICE_UNKNOWN;
+        athdv_win_string(identity, units, &d->identifier);
         if (d->identifier.status != CATALYST_STATUS_CODE_SUCCESS) { status = d->identifier.status; break; }
-        catdv_win_metadata(list, &info, d);
+        athdv_win_metadata(list, &info, d);
         if (hid) {
             HANDLE handle = CreateFileW(identity, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
-            if (handle == INVALID_HANDLE_VALUE) d->capability_status = catdv_win_error(GetLastError());
-            else { catdv_win_hid(handle, d); if (!CloseHandle(handle)) { status = catdv_win_error(GetLastError()); break; } }
+            if (handle == INVALID_HANDLE_VALUE) d->capability_status = athdv_win_error(GetLastError());
+            else { athdv_win_hid(handle, d); if (!CloseHandle(handle)) { status = athdv_win_error(GetLastError()); break; } }
         }
     }
-    if (!SetupDiDestroyDeviceInfoList(list) && status == CATALYST_STATUS_CODE_SUCCESS) status = catdv_win_error(GetLastError());
+    if (!SetupDiDestroyDeviceInfoList(list) && status == CATALYST_STATUS_CODE_SUCCESS) status = athdv_win_error(GetLastError());
     return status;
 }
 /* Resolve the exact monitor interface path, not a vendor/product substring. */
-static catalyst::STATUS_CODE catdv_win_edid(HKEY key, CATDVLIB_DISPLAY* display) {
+static catalyst::STATUS_CODE athdv_win_edid(HKEY key, ATHDVLIB_DISPLAY* display) {
     DWORD type = 0, size = 0;
     LSTATUS error = RegQueryValueExW(key, L"EDID", 0, &type, 0, &size);
-    if (error != ERROR_SUCCESS) return catdv_win_error((DWORD) error);
+    if (error != ERROR_SUCCESS) return athdv_win_error((DWORD) error);
     if (type != REG_BINARY) return CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT;
     if (!size) return CATALYST_STATUS_CODE_ERROR_NOT_FOUND;
     CATMMLIB_POINTERW memory = 0;
@@ -117,16 +117,16 @@ static catalyst::STATUS_CODE catdv_win_edid(HKEY key, CATDVLIB_DISPLAY* display)
     display->bytes = (CATALYST_BYTE*) memory; /* Owned even if retrieval fails. */
     DWORD actual = size;
     error = RegQueryValueExW(key, L"EDID", 0, &type, (PBYTE) memory, &actual);
-    if (error != ERROR_SUCCESS) return catdv_win_error((DWORD) error);
+    if (error != ERROR_SUCCESS) return athdv_win_error((DWORD) error);
     if (type != REG_BINARY || actual > size) return CATALYST_STATUS_CODE_ERROR_MALFORMED_INPUT;
     if (!actual) return CATALYST_STATUS_CODE_ERROR_NOT_FOUND;
     display->size = (catalyst::NUINT) actual;
     return CATALYST_STATUS_CODE_SUCCESS;
 }
 
-static void catdv_win_monitor_metadata(const WCHAR* path, CATDVLIB_DEVICE* d) {
+static void athdv_win_monitor_metadata(const WCHAR* path, ATHDVLIB_DEVICE* d) {
     HDEVINFO list = SetupDiCreateDeviceInfoList(0, 0);
-    if (list == INVALID_HANDLE_VALUE) { d->display.edid_status = catdv_win_error(GetLastError()); return; }
+    if (list == INVALID_HANDLE_VALUE) { d->display.edid_status = athdv_win_error(GetLastError()); return; }
     SP_DEVICE_INTERFACE_DATA iface;
     SP_DEVINFO_DATA info;
     catmm_fill(&iface, 0, sizeof(iface)); iface.cbSize = sizeof(iface);
@@ -135,55 +135,55 @@ static void catdv_win_monitor_metadata(const WCHAR* path, CATDVLIB_DEVICE* d) {
     catmm_fill(&storage, 0, sizeof(storage)); storage.detail.cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
     if (!SetupDiOpenDeviceInterfaceW(list, path, 0, &iface) ||
         !SetupDiGetDeviceInterfaceDetailW(list, &iface, &storage.detail, sizeof(storage), 0, &info))
-        d->display.edid_status = catdv_win_error(GetLastError());
+        d->display.edid_status = athdv_win_error(GetLastError());
     else {
-        catdv_win_metadata(list, &info, d);
+        athdv_win_metadata(list, &info, d);
         HKEY key = SetupDiOpenDevRegKey(list, &info, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_QUERY_VALUE);
-        if (key == INVALID_HANDLE_VALUE) d->display.edid_status = catdv_win_error(GetLastError());
+        if (key == INVALID_HANDLE_VALUE) d->display.edid_status = athdv_win_error(GetLastError());
         else {
-            d->display.edid_status = catdv_win_edid(key, &d->display);
+            d->display.edid_status = athdv_win_edid(key, &d->display);
             LSTATUS closed = RegCloseKey(key);
             if (closed != ERROR_SUCCESS && d->display.edid_status == CATALYST_STATUS_CODE_SUCCESS)
-                d->display.edid_status = catdv_win_error((DWORD) closed);
+                d->display.edid_status = athdv_win_error((DWORD) closed);
         }
     }
     if (!SetupDiDestroyDeviceInfoList(list) && d->display.edid_status == CATALYST_STATUS_CODE_SUCCESS)
-        d->display.edid_status = catdv_win_error(GetLastError());
+        d->display.edid_status = athdv_win_error(GetLastError());
 }
 
-struct CATDVLIB_WIN_DISPLAYS {
-    CATDVLIB_DEVICES* snapshot;
+struct ATHDVLIB_WIN_DISPLAYS {
+    ATHDVLIB_DEVICES* snapshot;
     catalyst::STATUS_CODE status;
 };
 
-static catalyst::STATUS_CODE catdv_win_display_entry(CATDVLIB_DEVICES* snapshot, HMONITOR handle, const WCHAR* identity,
+static catalyst::STATUS_CODE athdv_win_display_entry(ATHDVLIB_DEVICES* snapshot, HMONITOR handle, const WCHAR* identity,
     catalyst::NUINT units, const DISPLAY_DEVICEW* monitor) {
-    CATDVLIB_DEVICE* d;
-    catalyst::RESULT r = catdv_native_add(snapshot, &d);
+    ATHDVLIB_DEVICE* d;
+    catalyst::RESULT r = athdv_native_add(snapshot, &d);
     if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return r.status;
-    catdv_display_init(&d->display);
+    athdv_display_init(&d->display);
     d->display.handle = (catalyst::NUINT) handle;
     d->display.handle_status = CATALYST_STATUS_CODE_SUCCESS;
-    d->type = CATDVLIB_DEVICE_LOGICAL;
+    d->type = ATHDVLIB_DEVICE_LOGICAL;
     d->scheme = (CATALYST_ASCII) (monitor ? "windows-monitor" : "windows-display-source");
-    catdv_win_string(identity, units, &d->identifier);
+    athdv_win_string(identity, units, &d->identifier);
     if (d->identifier.status != CATALYST_STATUS_CODE_SUCCESS) return d->identifier.status;
     d->capability_status = CATALYST_STATUS_CODE_SUCCESS;
     d->output = CATALYST_TRUE;
     if (monitor) {
-        catdv_win_monitor_metadata(identity, d);
+        athdv_win_monitor_metadata(identity, d);
         if (d->descriptor.status == CATALYST_STATUS_CODE_ERROR_NOT_FOUND)
-            catdv_win_string(monitor->DeviceString, sizeof(monitor->DeviceString) / sizeof(WCHAR), &d->descriptor);
+            athdv_win_string(monitor->DeviceString, sizeof(monitor->DeviceString) / sizeof(WCHAR), &d->descriptor);
     }
     return CATALYST_STATUS_CODE_SUCCESS;
 }
 
-static BOOL CALLBACK catdv_win_monitor(HMONITOR handle, HDC, LPRECT, LPARAM context) {
-    CATDVLIB_WIN_DISPLAYS* scan = (CATDVLIB_WIN_DISPLAYS*) context;
+static BOOL CALLBACK athdv_win_monitor(HMONITOR handle, HDC, LPRECT, LPARAM context) {
+    ATHDVLIB_WIN_DISPLAYS* scan = (ATHDVLIB_WIN_DISPLAYS*) context;
     MONITORINFOEXW info;
     catmm_fill(&info, 0, sizeof(info)); info.cbSize = sizeof(info);
     if (!GetMonitorInfoW(handle, (LPMONITORINFO) &info)) {
-        scan->status = catdv_win_error(GetLastError()); return FALSE;
+        scan->status = athdv_win_error(GetLastError()); return FALSE;
     }
     bool found = false;
     for (DWORD index = 0; ; ++index) {
@@ -192,34 +192,34 @@ static BOOL CALLBACK catdv_win_monitor(HMONITOR handle, HDC, LPRECT, LPARAM cont
         if (!EnumDisplayDevicesW(info.szDevice, index, &monitor, EDD_GET_DEVICE_INTERFACE_NAME)) break;
         if (!(monitor.StateFlags & DISPLAY_DEVICE_ACTIVE) || !monitor.DeviceID[0]) continue;
         found = true;
-        scan->status = catdv_win_display_entry(scan->snapshot, handle, monitor.DeviceID,
+        scan->status = athdv_win_display_entry(scan->snapshot, handle, monitor.DeviceID,
             sizeof(monitor.DeviceID) / sizeof(WCHAR), &monitor);
         if (scan->status != CATALYST_STATUS_CODE_SUCCESS) return FALSE;
     }
     /* Virtual displays may have no monitor interface or EDID. Preserve source identity. */
-    if (!found) scan->status = catdv_win_display_entry(scan->snapshot, handle, info.szDevice,
+    if (!found) scan->status = athdv_win_display_entry(scan->snapshot, handle, info.szDevice,
         sizeof(info.szDevice) / sizeof(WCHAR), 0);
     return scan->status == CATALYST_STATUS_CODE_SUCCESS ? TRUE : FALSE;
 }
 
-static catalyst::STATUS_CODE catdv_win_displays(CATDVLIB_DEVICES* snapshot) {
-    CATDVLIB_WIN_DISPLAYS scan = { snapshot, CATALYST_STATUS_CODE_SUCCESS };
-    if (!EnumDisplayMonitors(0, 0, catdv_win_monitor, (LPARAM) &scan) && scan.status == CATALYST_STATUS_CODE_SUCCESS)
+static catalyst::STATUS_CODE athdv_win_displays(ATHDVLIB_DEVICES* snapshot) {
+    ATHDVLIB_WIN_DISPLAYS scan = { snapshot, CATALYST_STATUS_CODE_SUCCESS };
+    if (!EnumDisplayMonitors(0, 0, athdv_win_monitor, (LPARAM) &scan) && scan.status == CATALYST_STATUS_CODE_SUCCESS)
         return CATALYST_STATUS_CODE_ERROR_IO_ERROR;
     return scan.status;
 }
 
-CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices) {
+CATALYST_RESULT athdv_devices_enumerate(ATHDVLIB_DEVICES** devices) {
     *devices = 0;
     CATMMLIB_POINTERW memory = 0;
-    catalyst::RESULT r = catmm_alloc(&memory, sizeof(CATDVLIB_DEVICES));
+    catalyst::RESULT r = catmm_alloc(&memory, sizeof(ATHDVLIB_DEVICES));
     if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return catalyst::RESULT(r.status, 0x01, 0x01, r.detail);
-    CATDVLIB_DEVICES* snapshot = (CATDVLIB_DEVICES*) memory;
-    catalyst::STATUS_CODE status = catdv_win_scan(snapshot, CATALYST_FALSE);
-    if (status == CATALYST_STATUS_CODE_SUCCESS) status = catdv_win_scan(snapshot, CATALYST_TRUE);
-    if (status == CATALYST_STATUS_CODE_SUCCESS) status = catdv_win_displays(snapshot);
+    ATHDVLIB_DEVICES* snapshot = (ATHDVLIB_DEVICES*) memory;
+    catalyst::STATUS_CODE status = athdv_win_scan(snapshot, CATALYST_FALSE);
+    if (status == CATALYST_STATUS_CODE_SUCCESS) status = athdv_win_scan(snapshot, CATALYST_TRUE);
+    if (status == CATALYST_STATUS_CODE_SUCCESS) status = athdv_win_displays(snapshot);
     if (status != CATALYST_STATUS_CODE_SUCCESS) {
-        r = catdv_devices_free(snapshot);
+        r = athdv_devices_free(snapshot);
         if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return catalyst::RESULT(r.status, 0x01, 0x02, r.detail);
         return catalyst::RESULT(status, 0x01, 0x03, 0);
     }

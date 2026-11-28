@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "catsylib.hpp"
+#include "athidlib.hpp"
 
 
 typedef CATALYST_RESULT (*Query)(catalyst::UTF8W, catalyst::NUINT, catalyst::NUINT*);
@@ -16,12 +16,12 @@ struct TestCase {
 };
 
 static const TestCase cases[] = {
-    { "catsy_system_get_name", 0x01, catsy_system_get_name, catalyst::system_get_name },
-    { "catsy_system_get_version", 0x02, catsy_system_get_version, catalyst::system_get_version },
-    { "catsy_system_get_distribution", 0x03, catsy_system_get_distribution, catalyst::system_get_distribution },
-    { "catsy_system_get_distribution_version", 0x04, catsy_system_get_distribution_version, catalyst::system_get_distribution_version },
-    { "catsy_system_get_architecture", 0x05, catsy_system_get_architecture, catalyst::system_get_architecture },
-    { "catsy_system_get_hostname", 0x06, catsy_system_get_hostname, catalyst::system_get_hostname }
+    { "athid_system_get_name", 0x01, athid_system_get_name, catalyst::system_get_name },
+    { "athid_system_get_version", 0x02, athid_system_get_version, catalyst::system_get_version },
+    { "athid_system_get_distribution", 0x03, athid_system_get_distribution, catalyst::system_get_distribution },
+    { "athid_system_get_distribution_version", 0x04, athid_system_get_distribution_version, catalyst::system_get_distribution_version },
+    { "athid_system_get_architecture", 0x05, athid_system_get_architecture, catalyst::system_get_architecture },
+    { "athid_system_get_hostname", 0x06, athid_system_get_hostname, catalyst::system_get_hostname }
 };
 
 #if TARGET_PLATFORM_WIN32
@@ -129,7 +129,7 @@ static int test_query(const TestCase& test, int* unavailable) {
 }
 
 int main() {
-    std::printf("CATSYLIB Tests\n");
+    std::printf("ATHIDLIB Tests\n");
     std::printf("Target: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
     int failed = 0;
     int unavailable = 0;
@@ -138,6 +138,6 @@ int main() {
     }
     std::printf("\nFailures: %d; unavailable queries: %d\n", failed, unavailable);
     if (failed != 0) return 1;
-    std::printf("All available CATSYLIB contracts verified.\n");
+    std::printf("All available ATHIDLIB contracts verified.\n");
     return unavailable != 0 ? 2 : 0;
 }

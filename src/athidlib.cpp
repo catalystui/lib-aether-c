@@ -1,5 +1,5 @@
-#include "catsylib.internal.hpp"
-#include "catsylib.h"
+#include "athidlib.internal.hpp"
+#include "athidlib.h"
 #include "catalyst.hpp"
 #include "catmmlib.h"
 #include "cattelib.h"
@@ -9,7 +9,7 @@
  * Internal native text handling
  * ------------------------------------------------------------------------------------------------- */
 
-CATALYST_RESULT catsy_prepare_output(CATSYLIB_FIELD field, catalyst::NUINT length,
+CATALYST_RESULT athid_prepare_output(ATHIDLIB_FIELD field, catalyst::NUINT length,
     catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
     catalyst::CONTEXT_CODE context = (catalyst::CONTEXT_CODE) field;
 #if TARGET_PLATFORM_WIN32
@@ -27,7 +27,7 @@ CATALYST_RESULT catsy_prepare_output(CATSYLIB_FIELD field, catalyst::NUINT lengt
     return catalyst::RESULT(catalyst::STATUS_CODE_SUCCESS, context, copyOperation, 0);
 }
 
-CATALYST_RESULT catsy_copy_utf8(CATSYLIB_FIELD field, catalyst::UTF8 value,
+CATALYST_RESULT athid_copy_utf8(ATHIDLIB_FIELD field, catalyst::UTF8 value,
     catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
     catalyst::CONTEXT_CODE context = (catalyst::CONTEXT_CODE) field;
 #if TARGET_PLATFORM_WIN32
@@ -55,12 +55,12 @@ CATALYST_RESULT catsy_copy_utf8(CATSYLIB_FIELD field, catalyst::UTF8 value,
         }
         length += consumed;
     }
-    catalyst::RESULT result = catsy_prepare_output(field, length + (catalyst::NUINT) 1, output, capacity, required);
+    catalyst::RESULT result = athid_prepare_output(field, length + (catalyst::NUINT) 1, output, capacity, required);
     if (output != 0 && catalyst::status_code_is_success(result.status)) catmm_copy(output, value, *required);
     return result;
 }
 
-CATALYST_RESULT catsy_release(CATMMLIB_POINTERW memory, CATALYST_RESULT result,
+CATALYST_RESULT athid_release(CATMMLIB_POINTERW memory, CATALYST_RESULT result,
     catalyst::OPERATION_CODE operation, catalyst::NUINT* required) {
     if (memory == 0) return result;
     catalyst::RESULT released = catmm_free(memory);
@@ -80,32 +80,32 @@ CATALYST_RESULT catsy_release(CATMMLIB_POINTERW memory, CATALYST_RESULT result,
  * C API :: SYSTEM IDENTIFICATION
  * ------------------------------------------------------------------------------------------------- */
 
-static CATALYST_RESULT catsy_system_get(CATSYLIB_FIELD field, CATALYST_UTF8W output,
+static CATALYST_RESULT athid_system_get(ATHIDLIB_FIELD field, CATALYST_UTF8W output,
     CATALYST_NUINT capacity, CATALYST_NUINT* required) {
     *required = 0;
-    return catsy_platform_get(field, output, capacity, required);
+    return athid_platform_get(field, output, capacity, required);
 }
 
-CATALYST_RESULT catsy_system_get_name(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required) {
-    return catsy_system_get(CATSYLIB_FIELD_NAME, output, capacity, required);
+CATALYST_RESULT athid_system_get_name(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required) {
+    return athid_system_get(ATHIDLIB_FIELD_NAME, output, capacity, required);
 }
 
-CATALYST_RESULT catsy_system_get_version(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required) {
-    return catsy_system_get(CATSYLIB_FIELD_VERSION, output, capacity, required);
+CATALYST_RESULT athid_system_get_version(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required) {
+    return athid_system_get(ATHIDLIB_FIELD_VERSION, output, capacity, required);
 }
 
-CATALYST_RESULT catsy_system_get_distribution(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required) {
-    return catsy_system_get(CATSYLIB_FIELD_DISTRIBUTION, output, capacity, required);
+CATALYST_RESULT athid_system_get_distribution(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required) {
+    return athid_system_get(ATHIDLIB_FIELD_DISTRIBUTION, output, capacity, required);
 }
 
-CATALYST_RESULT catsy_system_get_distribution_version(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required) {
-    return catsy_system_get(CATSYLIB_FIELD_DISTRIBUTION_VERSION, output, capacity, required);
+CATALYST_RESULT athid_system_get_distribution_version(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required) {
+    return athid_system_get(ATHIDLIB_FIELD_DISTRIBUTION_VERSION, output, capacity, required);
 }
 
-CATALYST_RESULT catsy_system_get_architecture(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required) {
-    return catsy_system_get(CATSYLIB_FIELD_ARCHITECTURE, output, capacity, required);
+CATALYST_RESULT athid_system_get_architecture(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required) {
+    return athid_system_get(ATHIDLIB_FIELD_ARCHITECTURE, output, capacity, required);
 }
 
-CATALYST_RESULT catsy_system_get_hostname(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required) {
-    return catsy_system_get(CATSYLIB_FIELD_HOSTNAME, output, capacity, required);
+CATALYST_RESULT athid_system_get_hostname(CATALYST_UTF8W output, CATALYST_NUINT capacity, CATALYST_NUINT* required) {
+    return athid_system_get(ATHIDLIB_FIELD_HOSTNAME, output, capacity, required);
 }

@@ -9,8 +9,8 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "catsylib.hpp"
-#include "../src/catsylib.internal.hpp"
+#include "athidlib.hpp"
+#include "../src/athidlib.internal.hpp"
 
 #if TARGET_PLATFORM_WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -37,18 +37,18 @@ typedef catalyst::RESULT (*QueryCpp)(catalyst::UTF8W, catalyst::NUINT, catalyst:
 
 struct Benchmark {
     const char* name;
-    CATSYLIB_FIELD field;
+    ATHIDLIB_FIELD field;
     Query query;
     QueryCpp cpp;
 };
 
 static const Benchmark benchmarks[] = {
-    { "catsy_system_get_name", CATSYLIB_FIELD_NAME, catsy_system_get_name, catalyst::system_get_name },
-    { "catsy_system_get_version", CATSYLIB_FIELD_VERSION, catsy_system_get_version, catalyst::system_get_version },
-    { "catsy_system_get_distribution", CATSYLIB_FIELD_DISTRIBUTION, catsy_system_get_distribution, catalyst::system_get_distribution },
-    { "catsy_system_get_distribution_version", CATSYLIB_FIELD_DISTRIBUTION_VERSION, catsy_system_get_distribution_version, catalyst::system_get_distribution_version },
-    { "catsy_system_get_architecture", CATSYLIB_FIELD_ARCHITECTURE, catsy_system_get_architecture, catalyst::system_get_architecture },
-    { "catsy_system_get_hostname", CATSYLIB_FIELD_HOSTNAME, catsy_system_get_hostname, catalyst::system_get_hostname }
+    { "athid_system_get_name", ATHIDLIB_FIELD_NAME, athid_system_get_name, catalyst::system_get_name },
+    { "athid_system_get_version", ATHIDLIB_FIELD_VERSION, athid_system_get_version, catalyst::system_get_version },
+    { "athid_system_get_distribution", ATHIDLIB_FIELD_DISTRIBUTION, athid_system_get_distribution, catalyst::system_get_distribution },
+    { "athid_system_get_distribution_version", ATHIDLIB_FIELD_DISTRIBUTION_VERSION, athid_system_get_distribution_version, catalyst::system_get_distribution_version },
+    { "athid_system_get_architecture", ATHIDLIB_FIELD_ARCHITECTURE, athid_system_get_architecture, catalyst::system_get_architecture },
+    { "athid_system_get_hostname", ATHIDLIB_FIELD_HOSTNAME, athid_system_get_hostname, catalyst::system_get_hostname }
 };
 
 #if defined(CLOCKS_PER_SEC)
@@ -66,12 +66,12 @@ static bool native_copy(const char* value, catalyst::UTF8W output, catalyst::NUI
 
 #if TARGET_PLATFORM_LINUX
 // Accept common unescaped os-release assignments. More complicated valid
-// assignments are handled by CATSYLIB but not by this benchmark reference.
-static bool native_distribution(CATSYLIB_FIELD field, catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
+// assignments are handled by ATHIDLIB but not by this benchmark reference.
+static bool native_distribution(ATHIDLIB_FIELD field, catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
     FILE* file = std::fopen("/etc/os-release", "r");
     if (file == 0 && errno == ENOENT) file = std::fopen("/usr/lib/os-release", "r");
     if (file == 0) return false;
-    const char* key = field == CATSYLIB_FIELD_DISTRIBUTION ? "NAME=" : "VERSION_ID=";
+    const char* key = field == ATHIDLIB_FIELD_DISTRIBUTION ? "NAME=" : "VERSION_ID=";
     size_t keyLength = std::strlen(key);
     char line[512];
     char value[512];
@@ -123,16 +123,16 @@ static bool native_version(OSVERSIONINFOEXW* version) {
     return function((OSVERSIONINFOW*) version) == 0;
 }
 
-static bool native_registry(CATSYLIB_FIELD field, catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
+static bool native_registry(ATHIDLIB_FIELD field, catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
     HKEY key = 0;
     if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
         0, KEY_QUERY_VALUE | KEY_WOW64_64KEY, &key) != ERROR_SUCCESS) return false;
     WCHAR value[256];
     DWORD bytes = sizeof(value) - sizeof(WCHAR);
     DWORD type = 0;
-    LONG error = RegQueryValueExW(key, field == CATSYLIB_FIELD_DISTRIBUTION ? L"ProductName" :
+    LONG error = RegQueryValueExW(key, field == ATHIDLIB_FIELD_DISTRIBUTION ? L"ProductName" :
         L"DisplayVersion", 0, &type, (BYTE*) value, &bytes);
-    if (error == ERROR_FILE_NOT_FOUND && field == CATSYLIB_FIELD_DISTRIBUTION_VERSION) {
+    if (error == ERROR_FILE_NOT_FOUND && field == ATHIDLIB_FIELD_DISTRIBUTION_VERSION) {
         bytes = sizeof(value) - sizeof(WCHAR);
         error = RegQueryValueExW(key, L"ReleaseId", 0, &type, (BYTE*) value, &bytes);
     }
@@ -140,7 +140,7 @@ static bool native_registry(CATSYLIB_FIELD field, catalyst::UTF8W output, cataly
     if (error != ERROR_SUCCESS || closeError != ERROR_SUCCESS || type != REG_SZ ||
         bytes % sizeof(WCHAR) != 0 || bytes >= sizeof(value)) return false;
     value[bytes / sizeof(WCHAR)] = 0;
-    if (field == CATSYLIB_FIELD_DISTRIBUTION) {
+    if (field == ATHIDLIB_FIELD_DISTRIBUTION) {
         OSVERSIONINFOEXW version;
         if (wcsncmp(value, L"Windows 10", 10) == 0 && native_version(&version) &&
             version.wProductType == VER_NT_WORKSTATION && version.dwMajorVersion == 10 &&
@@ -165,22 +165,22 @@ static const char* native_architecture() {
 }
 #endif
 
-static bool native_query(CATSYLIB_FIELD field, catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
+static bool native_query(ATHIDLIB_FIELD field, catalyst::UTF8W output, catalyst::NUINT capacity, catalyst::NUINT* required) {
 #if TARGET_PLATFORM_LINUX || TARGET_PLATFORM_DARWIN
 #if TARGET_PLATFORM_LINUX
-    if (field == CATSYLIB_FIELD_DISTRIBUTION || field == CATSYLIB_FIELD_DISTRIBUTION_VERSION)
+    if (field == ATHIDLIB_FIELD_DISTRIBUTION || field == ATHIDLIB_FIELD_DISTRIBUTION_VERSION)
         return native_distribution(field, output, capacity, required);
 #elif TARGET_PLATFORM_DARWIN
-    if (field == CATSYLIB_FIELD_DISTRIBUTION)
+    if (field == ATHIDLIB_FIELD_DISTRIBUTION)
         return native_copy("macOS", output, capacity, required);
-    if (field == CATSYLIB_FIELD_DISTRIBUTION_VERSION) {
+    if (field == ATHIDLIB_FIELD_DISTRIBUTION_VERSION) {
         char value[128];
         size_t length = sizeof(value);
         if (sysctlbyname("kern.osproductversion", value, &length, 0, 0) != 0 ||
             length == 0 || length > sizeof(value) || value[length - 1] != 0) return false;
         return native_copy(value, output, capacity, required);
     }
-    if (field == CATSYLIB_FIELD_ARCHITECTURE) {
+    if (field == ATHIDLIB_FIELD_ARCHITECTURE) {
         int translated = 0;
         size_t length = sizeof(translated);
         if (sysctlbyname("sysctl.proc_translated", &translated, &length, 0, 0) == 0 && translated == 1)
@@ -191,10 +191,10 @@ static bool native_query(CATSYLIB_FIELD field, catalyst::UTF8W output, catalyst:
     if (uname(&info) != 0) return false;
     const char* value = 0;
     switch (field) {
-        case CATSYLIB_FIELD_NAME: value = info.sysname; break;
-        case CATSYLIB_FIELD_VERSION: value = info.release; break;
-        case CATSYLIB_FIELD_HOSTNAME: value = info.nodename; break;
-        case CATSYLIB_FIELD_ARCHITECTURE:
+        case ATHIDLIB_FIELD_NAME: value = info.sysname; break;
+        case ATHIDLIB_FIELD_VERSION: value = info.release; break;
+        case ATHIDLIB_FIELD_HOSTNAME: value = info.nodename; break;
+        case ATHIDLIB_FIELD_ARCHITECTURE:
             value = info.machine;
             if (std::strcmp(value, "aarch64") == 0) value = "arm64";
             else if (std::strcmp(value, "amd64") == 0) value = "x86_64";
@@ -206,8 +206,8 @@ static bool native_query(CATSYLIB_FIELD field, catalyst::UTF8W output, catalyst:
     return native_copy(value, output, capacity, required);
 #elif TARGET_PLATFORM_WIN32
     switch (field) {
-        case CATSYLIB_FIELD_NAME: return native_copy("Windows NT", output, capacity, required);
-        case CATSYLIB_FIELD_VERSION: {
+        case ATHIDLIB_FIELD_NAME: return native_copy("Windows NT", output, capacity, required);
+        case ATHIDLIB_FIELD_VERSION: {
             OSVERSIONINFOEXW version;
             if (!native_version(&version)) return false;
             char value[33];
@@ -215,14 +215,14 @@ static bool native_query(CATSYLIB_FIELD field, catalyst::UTF8W output, catalyst:
                 (unsigned long) version.dwMinorVersion, (unsigned long) version.dwBuildNumber);
             return native_copy(value, output, capacity, required);
         }
-        case CATSYLIB_FIELD_DISTRIBUTION:
-        case CATSYLIB_FIELD_DISTRIBUTION_VERSION:
+        case ATHIDLIB_FIELD_DISTRIBUTION:
+        case ATHIDLIB_FIELD_DISTRIBUTION_VERSION:
             return native_registry(field, output, capacity, required);
-        case CATSYLIB_FIELD_ARCHITECTURE: {
+        case ATHIDLIB_FIELD_ARCHITECTURE: {
             const char* value = native_architecture();
             return value != 0 && native_copy(value, output, capacity, required);
         }
-        case CATSYLIB_FIELD_HOSTNAME: {
+        case ATHIDLIB_FIELD_HOSTNAME: {
             WCHAR value[256];
             DWORD length = 256;
             if (!GetComputerNameExW(ComputerNameDnsHostname, value, &length)) return false;
@@ -243,7 +243,7 @@ static bool invoke(const Benchmark& benchmark, unsigned int mode, catalyst::UTF8
     *required = 0;
     if (mode == 3) return native_query(benchmark.field, output, capacity, required);
     CATALYST_RESULT result;
-    if (mode == 0) result = catsy_platform_get(benchmark.field, output, capacity, required);
+    if (mode == 0) result = athid_platform_get(benchmark.field, output, capacity, required);
     else if (mode == 1) result = benchmark.query(output, capacity, required);
     else result = benchmark.cpp(output, capacity, required);
 #if TARGET_PLATFORM_WIN32
@@ -356,10 +356,10 @@ static int benchmark_case(const Benchmark& benchmark, bool sizeOnly, catalyst::U
 int main() {
 #if defined(CLOCKS_PER_SEC)
     if (CLOCKS_PER_SEC <= 0 || std::clock() == (std::clock_t) -1) {
-        std::printf("CATSYLIB performance unavailable: no usable standard C clock.\n");
+        std::printf("ATHIDLIB performance unavailable: no usable standard C clock.\n");
         return 2;
     }
-    std::printf("CATSYLIB Performance (Release recommended)\n");
+    std::printf("ATHIDLIB Performance (Release recommended)\n");
     std::printf("Target: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
     std::printf("Median of three interleaved CPU-time samples; %lu ticks/second.\n", (unsigned long) CLOCKS_PER_SEC);
     std::printf("Backend baseline isolates public dispatch/wrapper overhead, not native acquisition overhead.\n");
@@ -371,7 +371,7 @@ int main() {
         std::printf("\n%s\n", benchmark.name);
         catalyst::NUINT required = 0;
         if (!invoke(benchmark, 1, 0, 0, &required, true) || required == 0) {
-            std::printf("  Query unavailable or failed; run test_catsylib for status details.\n");
+            std::printf("  Query unavailable or failed; run test_athidlib for status details.\n");
             ++unavailable;
             continue;
         }
@@ -391,7 +391,7 @@ int main() {
     std::printf("\nFailures: %d; unavailable queries: %d\n", failed, unavailable);
     return failed != 0 ? 1 : unavailable != 0 ? 2 : 0;
 #else
-    std::printf("CATSYLIB performance unavailable: standard C clock not provided.\n");
+    std::printf("ATHIDLIB performance unavailable: standard C clock not provided.\n");
     return 2;
 #endif
 }
