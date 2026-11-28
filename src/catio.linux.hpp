@@ -64,7 +64,7 @@ static inline CATALYST_RESULT catio_open(const CATDVLIB_DEVICE* device, int mode
     if (strcmp((const char*) id.scheme, "linux-sysfs") != 0) return RESULT(STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED, 0x80, 2, 0);
     const char* name = strrchr((const char*) id.value, '/');
     if (!name || strncmp(++name, "event", 5) != 0 || !name[5] || strspn(name + 5, "0123456789") != strlen(name + 5))
-        return RESULT(STATUS_CODE_ERROR_SYSTEM_NOT_SUPPORTED, 0x80, 3, 0);
+        return RESULT(STATUS_CODE_ERROR_NOT_IMPLEMENTED, 0x80, 3, 0);
     char path[PATH_MAX];
     int len = snprintf(path, sizeof(path), "/dev/input/%s", name);
     if (len < 0 || (size_t) len >= sizeof(path)) return RESULT(STATUS_CODE_ERROR_BUFFER_OVERFLOW, 0x80, 4, 0);

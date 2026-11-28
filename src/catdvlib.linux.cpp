@@ -13,7 +13,8 @@ struct CATDVLIB_TEXT {
 struct CATDVLIB_DEVICE {
     CATDVLIB_DEVICE_TYPE type;
     char path[PATH_MAX];
-    CATDVLIB_TEXT hwid, serial, manufacturer, product, descriptor, revision;
+    CATDVLIB_TEXT hwid, bus_hwid, serial, manufacturer, product, descriptor, revision;
+    CATALYST_ASCII bus_scheme;
     CATALYST_STATUS_CODE capability_status;
     CATALYST_BOOL input, output;
 };
@@ -51,6 +52,53 @@ static void catdv_attribute(const char* root, const char* name, CATDVLIB_TEXT* f
     field->status = r.status;
 }
 
+/* Validate hexadecimal ID fields without assuming a native integer width. */
+static const char* catdv_hex_id(const CATDVLIB_TEXT* field) {
+    const char* text = field->text;
+    if (text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) text += 2;
+    if (strlen(text) != 4 || strspn(text, "0123456789abcdefABCDEF") != 4) return 0;
+    return text;
+}
+
+/* Store one bus/model identifier in addition to the native modalias. */
+static void catdv_bus_hwid(CATDVLIB_DEVICE* device, CATALYST_BYTE kind) {
+    CATDVLIB_TEXT vendor, product, bus;
+    const char* root = device->path;
+    const char* vendor_key = kind == 0 ? "idVendor" : (kind == 1 ? "vendor" : "device/id/vendor");
+    const char* product_key = kind == 0 ? "idProduct" : (kind == 1 ? "device" : "device/id/product");
+    /* USB interface identity is distinct from the physical USB model. The
+     * interface's native modalias remains available; do not invent a bus ID. */
+    device->bus_hwid.status = STATUS_CODE_ERROR_NOT_FOUND;
+    if (kind == 0 && device->type == CATDVLIB_DEVICE_LOGICAL) return;
+    catdv_attribute(root, vendor_key, &vendor);
+    catdv_attribute(root, product_key, &product);
+    if (vendor.status != STATUS_CODE_SUCCESS) { device->bus_hwid.status = vendor.status; return; }
+    if (product.status != STATUS_CODE_SUCCESS) { device->bus_hwid.status = product.status; return; }
+    const char* vid = catdv_hex_id(&vendor);
+    const char* pid = catdv_hex_id(&product);
+    if (!vid || !pid) { device->bus_hwid.status = STATUS_CODE_ERROR_MALFORMED_INPUT; return; }
+    int len;
+    if (kind == 2) {
+        catdv_attribute(root, "device/id/bustype", &bus);
+        if (bus.status != STATUS_CODE_SUCCESS) { device->bus_hwid.status = bus.status; return; }
+        const char* bid = catdv_hex_id(&bus);
+        if (!bid) { device->bus_hwid.status = STATUS_CODE_ERROR_MALFORMED_INPUT; return; }
+        device->bus_scheme = (CATALYST_ASCII) "linux-input";
+        len = snprintf(device->bus_hwid.text, sizeof(device->bus_hwid.text), "%s:%s:%s", bid, vid, pid);
+    } else {
+        device->bus_scheme = (CATALYST_ASCII) (kind == 0 ? "usb" : "pci");
+        len = snprintf(device->bus_hwid.text, sizeof(device->bus_hwid.text), "%s:%s", vid, pid);
+    }
+    if (len < 0 || (size_t) len >= sizeof(device->bus_hwid.text)) {
+        device->bus_hwid.status = STATUS_CODE_ERROR_BUFFER_OVERFLOW;
+        return;
+    }
+    /* Hexadecimal fields have an explicit uppercase canonical spelling. */
+    for (char* p = device->bus_hwid.text; *p; ++p)
+        if (*p >= 'a' && *p <= 'f') *p = (char) (*p - 'a' + 'A');
+    device->bus_hwid.status = STATUS_CODE_SUCCESS;
+}
+
 static void catdv_fill(CATDVLIB_DEVICE* device, CATALYST_BYTE kind) {
     device->type = kind == 2 ? CATDVLIB_DEVICE_LOGICAL : CATDVLIB_DEVICE_PHYSICAL;
     /* USB interface records are logical; PCI records identify hardware functions. */
@@ -86,6 +134,7 @@ static void catdv_fill(CATDVLIB_DEVICE* device, CATALYST_BYTE kind) {
         catdv_attribute(root, kind == 0 ? "bcdDevice" : "revision", &device->revision);
         device->capability_status = STATUS_CODE_ERROR_NOT_IMPLEMENTED;
     }
+    catdv_bus_hwid(device, kind);
 }
 
 static CATALYST_RESULT catdv_scan(CATDVLIB_DEVICES* snapshot, const char* root, CATALYST_BYTE kind) {
@@ -111,6 +160,12 @@ static CATALYST_RESULT catdv_scan(CATDVLIB_DEVICES* snapshot, const char* root, 
         if (!realpath(path, resolved)) {
             if (errno == ENOENT || errno == ENODEV) continue;
             result = RESULT(catio_errno(errno), 0x80, 6, 0); break;
+        }
+        CATALYST_NUINT length;
+        CATALYST_RESULT valid = catte_utf8_length((CATALYST_UTF8) resolved, &length);
+        if (!CATALYST_STATUS_CODE_IS_SUCCESS(valid.status)) {
+            result = RESULT(valid.status, 0x80, 11, valid.detail);
+            break;
         }
         CATALYST_BOOL duplicate = CATALYST_FALSE;
         for (CATALYST_NUINT j = 0; j < snapshot->count; ++j)
@@ -146,7 +201,7 @@ CATALYST_RESULT catdv_devices_enumerate(CATDVLIB_DEVICES** devices) {
     if (!CATALYST_STATUS_CODE_IS_SUCCESS(r.status)) return RESULT(r.status, 0x01, 0x01, r.detail);
     CATDVLIB_DEVICES* snapshot = (CATDVLIB_DEVICES*) memory;
     const char* roots[] = { "/sys/bus/usb/devices", "/sys/bus/pci/devices", "/sys/class/input" };
-    if (access("/sys", F_OK) != 0) {
+    if (access("/sys/devices", F_OK) != 0) {
         CATALYST_STATUS_CODE status = catio_errno(errno);
         CATALYST_RESULT released = catmm_free(snapshot);
         if (!CATALYST_STATUS_CODE_IS_SUCCESS(released.status)) return RESULT(released.status, 0x01, 0x02, released.detail);
@@ -198,12 +253,18 @@ CATALYST_RESULT catdv_device_get_identifier(const CATDVLIB_DEVICE* device, CATDV
 CATALYST_RESULT catdv_device_get_hwid_count(const CATDVLIB_DEVICE* device, CATALYST_NUINT* count) {
     *count = 0;
     if (device->hwid.status != STATUS_CODE_SUCCESS && device->hwid.status != STATUS_CODE_ERROR_NOT_FOUND) return RESULT(device->hwid.status, 0x07, 0x01, 0);
-    *count = device->hwid.status == STATUS_CODE_SUCCESS ? 1 : 0;
+    if (device->bus_hwid.status != STATUS_CODE_SUCCESS && device->bus_hwid.status != STATUS_CODE_ERROR_NOT_FOUND) return RESULT(device->bus_hwid.status, 0x07, 0x03, 0);
+    if (device->bus_hwid.status == STATUS_CODE_SUCCESS) ++*count;
+    if (device->hwid.status == STATUS_CODE_SUCCESS) ++*count;
     return RESULT(STATUS_CODE_SUCCESS, 0x07, 0x02, 0);
 }
 
 CATALYST_RESULT catdv_device_get_hwid(const CATDVLIB_DEVICE* device, CATALYST_NUINT index, CATDVLIB_IDENTIFIER* hwid) {
-    (void) index;
+    if (device->bus_hwid.status == STATUS_CODE_SUCCESS && index == 0) {
+        hwid->scheme = device->bus_scheme;
+        hwid->value = (CATALYST_UTF8) device->bus_hwid.text;
+        return RESULT(STATUS_CODE_SUCCESS, 0x08, 0x02, 0);
+    }
     hwid->scheme = (CATALYST_ASCII) "linux-modalias";
     hwid->value = (CATALYST_UTF8) device->hwid.text;
     return RESULT(STATUS_CODE_SUCCESS, 0x08, 0x01, 0);

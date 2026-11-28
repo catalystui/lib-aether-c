@@ -62,7 +62,7 @@ CATDVLIB_API CATDVLIB_DEVICE_TYPE catdv_device_get_type(const CATDVLIB_DEVICE* d
 /** Retrieve a borrowed system instance identifier; zero fields on failure. */
 CATDVLIB_API CATALYST_RESULT catdv_device_get_identifier(const CATDVLIB_DEVICE* device, CATDVLIB_IDENTIFIER* identifier);
 
-/** Retrieve the count of available hardware identifiers; zero on failure. */
+/** Retrieve the count of available hardware identifiers; zero on failure. Bus/model IDs precede native aliases. */
 CATDVLIB_API CATALYST_RESULT catdv_device_get_hwid_count(const CATDVLIB_DEVICE* device, CATALYST_NUINT* count);
 
 /** Retrieve a borrowed hardware identifier at an index from the reported count; zero fields on failure. */

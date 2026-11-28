@@ -7,9 +7,9 @@
 
 ## Usage Notes
 
-This initial implementation supports Linux USB/PCI sysfs and evdev device discovery; hardware IDs preserve native modalias strings rather than normalizing them. Windows and Darwin return ERROR_NOT_IMPLEMENTED for reporting operations. No native objects are created there. All pointers and indices must meet header preconditions; synchronize access externally. Numeric values are native integer measurements, not normalized; 32-bit measurement APIs require CATALYST_SUPPORTS_32BIT.
+This initial implementation supports Linux USB/PCI sysfs and evdev device discovery; hardware IDs include native modalias strings plus supported bus/model identifiers. Windows and Darwin return ERROR_NOT_IMPLEMENTED for reporting operations. No native objects are created there. All pointers and indices must meet header preconditions; synchronize access externally. Numeric values are native integer measurements, not normalized; 32-bit measurement APIs require CATALYST_SUPPORTS_32BIT.
 
-Device snapshots are finite and retain metadata until freed. A Linux sysfs instance path identifies a kernel resource, not a permanent identity; hot-plug may invalidate or reuse it. Only evdev logical devices have queried I/O capabilities. Unknown properties return NOT_FOUND or the native error. Metadata exceeding 1023 bytes is reported as BUFFER_OVERFLOW. No EDID parsing or HWID normalization. If a snapshot free fails, retry on the same snapshot; do not use any old borrowed references.
+Device snapshots are finite and retain metadata until freed. A Linux sysfs instance path identifies a kernel resource, not a permanent identity; hot-plug may invalidate or reuse it. Only evdev logical devices have queried I/O capabilities. Unknown properties return NOT_FOUND or the native error. Metadata exceeding 1023 bytes is reported as BUFFER_OVERFLOW. No EDID parsing. HWIDs are not device instance identities. The `usb` and `pci` schemes use uppercase four-hex-digit `VID:PID` pairs, while `linux-input` uses `BUS:VID:PID` with four hex digits per field. The native `linux-modalias` scheme preserves the original sysfs text. USB interface entries retain the modalias rather than claiming the physical USB model identity. When both a bus/model identifier and a modalias exist, the bus/model identifier is first. If a snapshot free fails, retry on the same snapshot; do not use any old borrowed references.
 
 ## Types and constants
 
@@ -159,6 +159,7 @@ CATALYST_RESULT catdv_device_get_hwid_count(const CATDVLIB_DEVICE* device, CATAL
 | --- | --- | --- | --- |
 | `0xSS070100` | Propagated native/dependency status | 0x01 | — |
 | `0x00070200` | SUCCESS | 0x02 | — |
+| `0xSS070300` | Bus identifier retrieval error | 0x03 | — |
 | `0x8507F000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
 ### catdv_device_get_hwid
@@ -180,7 +181,8 @@ CATALYST_RESULT catdv_device_get_hwid(const CATDVLIB_DEVICE* device, CATALYST_NU
 
 | Result | Status | Operation | Detail |
 | --- | --- | --- | --- |
-| `0x00080100` | SUCCESS | 0x01 | — |
+| `0x00080100` | SUCCESS | 0x01 (native modalias) | — |
+| `0x00080200` | SUCCESS | 0x02 (bus/model identifier) | — |
 | `0x8508F000` | ERROR_NOT_IMPLEMENTED | Backend unavailable | — |
 
 ### catdv_device_get_serial
