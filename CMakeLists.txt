@@ -147,4 +147,8 @@ if(CATALYST_AETHER_BUILD_TESTS)
         SHARED_DEPENDS
             catsylib_shared
     )
+    foreach(MODULE catdv catin catot)
+        target_link_libraries(test_${MODULE}lib PRIVATE Catalyst::${MODULE}_static)
+        target_link_libraries(perf_${MODULE}lib PRIVATE Catalyst::${MODULE}_static)
+    endforeach()
 endif()
