@@ -57,15 +57,20 @@ static PerfOutcome query(void* fixture, bool cpp) {
     }
     return PerfOutcome(r, digest);
 }
-/* A pending same-value write is the only request that may be retried.
- * Do not switch to another output channel until completion is observed. */
-static bool drain_write(Fixture* f) {
-    for (unsigned long j = 0; j < 100000; ++j) {
-        PerfOutcome result = query(f, false);
-        if (result.result.status == catalyst::STATUS_CODE_SUCCESS) return true;
-        if (result.result.status != catalyst::STATUS_CODE_SUCCESS_NOOP) return false;
+/* One sample call submits and observes completion of one request.
+ * Never transfer an unfinished operation between C and C++ samples. */
+static PerfOutcome completed_write(void* fixture, bool cpp) {
+    Fixture* f = (Fixture*) fixture;
+    std::time_t start = std::time(0);
+    for (;;) {
+        PerfOutcome outcome = query(fixture, cpp);
+        if (outcome.result.status != catalyst::STATUS_CODE_SUCCESS_NOOP) return outcome;
+        if (outcome.result.context != f->field || !outcome.result.operation || outcome.result.detail)
+            return PerfOutcome(catalyst::RESULT(catalyst::STATUS_CODE_ERROR_INVALID_STATE, f->field, 0xFF, 0), 0);
+        std::time_t now = std::time(0);
+        if (start == (std::time_t) -1 || now == (std::time_t) -1 || now < start || std::difftime(now, start) >= 5.0)
+            return PerfOutcome(catalyst::RESULT(catalyst::STATUS_CODE_ERROR_TIMEOUT, f->field, 0xFF, 0), 0);
     }
-    return false;
 }
 
 int main(int argc, char** argv) {
@@ -74,6 +79,7 @@ int main(int argc, char** argv) {
     std::printf("CATOTLIB Performance (Release recommended)\nTarget: %s/%s/%s\n", TARGET_VENDOR, TARGET_SYSTEM, TARGET_ARCHITECTURE);
     std::printf("Median of three CPU-time samples; C API vs C++ wrapper; independent direct native state/range reference when the same device/channel/value is available.\n");
     std::printf("Read-only by default. --write selects a device for same-value write benchmarks; no guessed reports.\n");
+    if (write) std::printf("Write timing includes completion polling; CPU time is not wall-clock device latency.\n");
     CATDVLIB_DEVICES* snapshot = 0;
     catalyst::RESULT r = catdv_devices_enumerate(&snapshot);
     if (r.status != catalyst::STATUS_CODE_SUCCESS || !snapshot) return 2;
@@ -81,6 +87,7 @@ int main(int argc, char** argv) {
     catalyst::NUINT opened = 0;
     bool lifecycleDone = false, countDone = false, metadataDone = false;
     bool digital = false;
+    unsigned completedWriteBenchmarks = 0;
 #if CATALYST_SUPPORTS_32BIT
     bool absolute = false;
 #endif
@@ -163,9 +170,10 @@ int main(int argc, char** argv) {
 #endif
                     if (write && catot_digital_get_state(f.resource, k, &f.state).status == catalyst::STATUS_CODE_SUCCESS) {
                         f.field = 0x08;
-                        int measured = benchmark_io("reapply digital state", query, &f, f.field, 64, false);
+                        int measured = benchmark_io("reapply digital state (through completion)", completed_write, &f, f.field, 16, false);
                         perf_record(measured, &failed, &unavailable);
-                        if (measured != 0 || !drain_write(&f)) { ++unavailable; break; }
+                        if (measured == 0) ++completedWriteBenchmarks;
+                        if (measured != 0) break;
 #if TARGET_PLATFORM_LINUX
                         CATDVLIB_IDENTIFIER id = {0, 0};
                         unsigned eventType, eventCode;
@@ -177,9 +185,10 @@ int main(int argc, char** argv) {
                             f.native.type = EV_LED; f.native.code = (unsigned short) eventCode;
                             f.native.value = f.state ? 1 : 0;
                             f.field = 0x03;
-                            measured = benchmark_io("native LED record submission", query, &f, f.field, 64, false);
+                            measured = benchmark_io("native LED record submission (through completion)", completed_write, &f, f.field, 16, false);
                             perf_record(measured, &failed, &unavailable);
-                            if (measured != 0 || !drain_write(&f)) { ++unavailable; break; }
+                            if (measured == 0) ++completedWriteBenchmarks;
+                        if (measured != 0) break;
                         }
 #endif
                     }
@@ -214,9 +223,10 @@ int main(int argc, char** argv) {
                         benchmark_native_state(d, channelId, true, false, false, value, 0, cValue);
                     if (write && catot_absolute_get_value(f.resource, k, &f.value).status == catalyst::STATUS_CODE_SUCCESS) {
                         f.field = 0x0B;
-                        int measured = benchmark_io("reapply absolute value", query, &f, f.field, 64, false);
+                        int measured = benchmark_io("reapply absolute value (through completion)", completed_write, &f, f.field, 16, false);
                         perf_record(measured, &failed, &unavailable);
-                        if (measured != 0 || !drain_write(&f)) { ++unavailable; break; }
+                        if (measured == 0) ++completedWriteBenchmarks;
+                        if (measured != 0) break;
                     }
                 }
 
@@ -225,8 +235,12 @@ int main(int argc, char** argv) {
         }
         r = catot_device_close(f.resource);
 #if TARGET_PLATFORM_DARWIN
-        for (unsigned long attempt = 0; r.status == catalyst::STATUS_CODE_ERROR_INVALID_STATE && attempt < 100000; ++attempt)
+        std::time_t start = std::time(0);
+        while (r.status == catalyst::STATUS_CODE_ERROR_INVALID_STATE) {
+            std::time_t now = std::time(0);
+            if (start == (std::time_t) -1 || now == (std::time_t) -1 || now < start || std::difftime(now, start) >= 5.0) break;
             r = catot_device_close(f.resource);
+        }
 #endif
         if (r.status != catalyst::STATUS_CODE_SUCCESS) ++failed;
         // Each operation is measured on its first suitable representative.
@@ -246,6 +260,7 @@ int main(int argc, char** argv) {
 #endif
     }
     if (!write) std::printf("Output write timing not requested.\n");
+    else if (!completedWriteBenchmarks) { std::printf("No completed output write benchmark.\n"); ++unavailable; }
 #if !TARGET_PLATFORM_LINUX
     std::printf("Raw output record timing unavailable without a device-specific known report.\n");
 #endif

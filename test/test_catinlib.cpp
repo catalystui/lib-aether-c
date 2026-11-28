@@ -8,7 +8,7 @@ static void test_input(TestReport* report, CATINLIB_INPUT* input) {
     report->check(same_result(r, c) && count == cppCount, "channel count parity");
     if (report->result("channel count", r, 0x04)) {
         if (!count) report->skip("no channels");
-        catalyst::NUINT rawOnly = 0;
+        catalyst::NUINT rawOnly = 0, digitalCount = 0, absoluteCount = 0, relativeCount = 0;
         for (catalyst::NUINT j = 0; j < count; ++j) {
             CATINLIB_CHANNEL_TYPE type = CATINLIB_CHANNEL_UNKNOWN, cppType = CATINLIB_CHANNEL_UNKNOWN;
             r = catin_channel_get_type(input, j, &type); c = catalyst::input::channel_get_type(input, j, &cppType);
@@ -20,6 +20,9 @@ static void test_input(TestReport* report, CATINLIB_INPUT* input) {
                 report->check(same_identifier(id, cppId) && same_result(r, c), "channel identifier parity");
             else report->check(!id.scheme && !id.value, "channel identifier failure outputs");
             if (type == CATINLIB_CHANNEL_UNKNOWN) ++rawOnly;
+            else if (type == CATINLIB_CHANNEL_DIGITAL) ++digitalCount;
+            else if (type == CATINLIB_CHANNEL_ABSOLUTE) ++absoluteCount;
+            else if (type == CATINLIB_CHANNEL_RELATIVE) ++relativeCount;
             if (type == CATINLIB_CHANNEL_DIGITAL) {
                 catalyst::BOOL state = catalyst::FALSE;
                 r = catalyst::input::digital_get_state(input, j, &state);
@@ -50,8 +53,9 @@ static void test_input(TestReport* report, CATINLIB_INPUT* input) {
             }
 #endif
         }
-        std::printf("Channels: %lu total; %lu without scalar interpretation\n",
-            (unsigned long) count, (unsigned long) rawOnly);
+        std::printf("Channels: %lu total; %lu digital, %lu absolute, %lu relative, %lu unknown\n",
+            (unsigned long) count, (unsigned long) digitalCount, (unsigned long) absoluteCount,
+            (unsigned long) relativeCount, (unsigned long) rawOnly);
     } else report->check(!count, "channel count failure output");
     catalyst::BYTE buffer[4097];
     std::memset(buffer, 0xA5, sizeof(buffer));

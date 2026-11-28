@@ -7,6 +7,7 @@
 /* Writes are opt-in and reapply the currently observed value only. */
 static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write) {
     catalyst::NUINT count = 0, cppCount = 0;
+    unsigned long completedWrites = 0;
     catalyst::RESULT r = catot_device_get_channel_count(output, &count);
     catalyst::RESULT c = catalyst::output::device_get_channel_count(output, &cppCount);
     report->check(same_result(r, c) && count == cppCount, "channel count parity");
@@ -39,6 +40,7 @@ static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write)
                         }
                         if (r.status == catalyst::STATUS_CODE_SUCCESS_NOOP) { report->check(false, "digital write completion not observed"); return; }
                         if (report->result("reapply digital state", r, 0x08)) {
+                            ++completedWrites;
                             catalyst::BOOL observed = catalyst::FALSE;
                             catalyst::RESULT readback = catot_digital_get_state(output, j, &observed);
                             if (report->result("digital write readback", readback, 0x07))
@@ -80,6 +82,7 @@ static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write)
                         }
                         if (r.status == catalyst::STATUS_CODE_SUCCESS_NOOP) { report->check(false, "absolute write completion not observed"); return; }
                         if (report->result("reapply absolute value", r, 0x0B)) {
+                            ++completedWrites;
                             catalyst::INT observed = 0;
                             catalyst::RESULT readback = catot_absolute_get_value(output, j, &observed);
                             if (report->result("absolute write readback", readback, 0x0A))
@@ -108,6 +111,10 @@ static void test_output(TestReport* report, CATOTLIB_OUTPUT* output, bool write)
     else if (r.status == catalyst::STATUS_CODE_ERROR_NOT_IMPLEMENTED) report->result("native output record", r, 0x03);
     else report->check(false, "reject incomplete native record");
     report->check(!written, "failed write extent");
+    if (write) {
+        std::printf("Acknowledged typed writes: %lu\n", completedWrites);
+        if (!completedWrites) report->skip("no typed output write completed");
+    }
 }
 
 int main(int argc, char** argv) {
@@ -147,8 +154,12 @@ int main(int argc, char** argv) {
         r = catalyst::output::device_close(output);
         /* Darwin may need to finish the asynchronous request before close. */
 #if TARGET_PLATFORM_DARWIN
-        for (unsigned long attempt = 0; r.status == catalyst::STATUS_CODE_ERROR_INVALID_STATE && attempt < 100000; ++attempt)
+        std::time_t start = std::time(0);
+        while (r.status == catalyst::STATUS_CODE_ERROR_INVALID_STATE) {
+            std::time_t now = std::time(0);
+            if (start == (std::time_t) -1 || now == (std::time_t) -1 || now < start || std::difftime(now, start) >= 5.0) break;
             r = catalyst::output::device_close(output);
+        }
 #endif
         report.result("close output", r, 0x02);
         report.summary(before);
