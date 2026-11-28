@@ -17,6 +17,9 @@
 #endif
 #if TARGET_PLATFORM_DARWIN
 #include <sys/sysctl.h>
+/* sysctl.h transitively includes Mach Boolean macros. */
+#undef TRUE
+#undef FALSE
 #endif
 
 

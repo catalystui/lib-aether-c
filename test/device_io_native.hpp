@@ -1,10 +1,12 @@
 #ifndef DEVICE_IO_NATIVE_HPP
 #define DEVICE_IO_NATIVE_HPP
+#include "device_io_test.hpp"
+
 #if TARGET_PLATFORM_DARWIN
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 #include <IOKit/hid/IOHIDLib.h>
-/* Remove native Boolean macros before declaring Catalyst constants. */
+/* Keep native Boolean macros out of the benchmark callers. */
 #undef TRUE
 #undef FALSE
 #endif
@@ -18,7 +20,6 @@
 #include <limits.h>
 #endif
 
-#include "device_io_test.hpp"
 
 /* Independent test-only native reference. Match the exact instance and channel
  * before timing; never call Aether's private backend or synthesize hardware. */

@@ -1,6 +1,8 @@
 #include "catotlib.h"
 #include "catio.darwin.hpp"
 #include <mach/mach_time.h>
+#undef TRUE
+#undef FALSE
 
 struct CATOTLIB_OUTPUT {
     CATIO_MAC_RESOURCE io;

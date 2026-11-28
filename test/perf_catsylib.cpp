@@ -26,6 +26,8 @@
 #include <errno.h>
 #elif TARGET_PLATFORM_DARWIN
 #include <sys/sysctl.h>
+#undef TRUE
+#undef FALSE
 #endif
 #endif
 
